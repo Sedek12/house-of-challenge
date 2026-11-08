@@ -1,0 +1,49 @@
+# Déploiement VPS : docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"   # à placer derrière un reverse proxy HTTPS (Caddy, Nginx, Traefik)
+    volumes:
+      - storage:/var/www/html/storage/app
+
+  # Tâches planifiées (holds, réconciliation paiements, rappels, expirations) toutes les 5 min.
+  scheduler:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      RUN_MIGRATIONS: "0"
+    depends_on:
+      - app
+    command: ["php", "artisan", "schedule:work"]
+    volumes:
+      - storage:/var/www/html/storage/app
+
+volumes:
+  dbdata:
+  storage:

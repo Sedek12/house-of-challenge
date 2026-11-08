@@ -18,7 +18,7 @@ export default function Payments({ payments, packages, users }: { payments: { da
                     <Field label="Formule" error={err.package_id}><select className={inputCls} value={data.package_id} onChange={(e) => setData('package_id', e.target.value)} required><option value="" />{packages.map((p) => <option key={p.id} value={p.id}>{p.name} — {fcfa(p.price)}</option>)}</select></Field>
                     <Field label="Moyen"><select className={inputCls} value={data.method} onChange={(e) => setData('method', e.target.value)}><option value="ESPECES">Espèces</option><option value="TRANSFERT">Transfert</option></select></Field>
                     <Field label="Mode (prix)"><select className={inputCls} value={data.mode} onChange={(e) => setData('mode', e.target.value)}><option value="">Prix standard</option><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select></Field>
-                    <button disabled={processing} className="self-end rounded-md bg-[#C8662B] px-3 py-2 text-white">Enregistrer</button>
+                    <button disabled={processing} className="self-end rounded-md bg-[#B05A26] px-3 py-2 text-white">Enregistrer</button>
                 </form>
             </Card>
             <div className="overflow-x-auto rounded-lg border bg-white">

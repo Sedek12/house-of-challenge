@@ -36,7 +36,7 @@ export default function Funnel({ projects, slots, packages, credits, pending, qu
             <Head title="Réserver" />
             <ol className="mb-6 flex gap-2 text-xs sm:text-sm">
                 {steps.map((s, i) => (
-                    <li key={s} className={`flex-1 rounded px-2 py-1 text-center ${i + 1 === step ? 'bg-[#C8662B] text-white' : i + 1 < step ? 'bg-green-100' : 'bg-neutral-200'}`}>{i + 1}. {s}</li>
+                    <li key={s} className={`flex-1 rounded px-2 py-1 text-center ${i + 1 === step ? 'bg-[#B05A26] text-white' : i + 1 < step ? 'bg-green-100' : 'bg-neutral-200'}`}>{i + 1}. {s}</li>
                 ))}
             </ol>
 
@@ -59,13 +59,13 @@ export default function Funnel({ projects, slots, packages, credits, pending, qu
                     <section>
                         <h2 className="mb-2 text-lg font-bold">1. Votre projet</h2>
                         {projects.length === 0 ? (
-                            <Card>Vous n’avez pas encore de projet. <Link className="text-[#C8662B] underline" href={route('space.projects.create')}>Créer ma fiche projet</Link></Card>
+                            <Card>Vous n’avez pas encore de projet. <Link className="text-[#B05A26] underline" href={route('space.projects.create')}>Créer ma fiche projet</Link></Card>
                         ) : (
                             <div className="flex flex-wrap gap-2">
                                 {projects.map((p) => (
-                                    <button key={p.id} onClick={() => nav({ project: p.id })} className={`rounded-md border px-3 py-2 text-sm ${projectId === p.id ? 'border-[#C8662B] bg-[#C8662B] text-white' : 'bg-white'}`}>{p.title}</button>
+                                    <button key={p.id} onClick={() => nav({ project: p.id })} className={`rounded-md border px-3 py-2 text-sm ${projectId === p.id ? 'border-[#B05A26] bg-[#B05A26] text-white' : 'bg-white'}`}>{p.title}</button>
                                 ))}
-                                <Link className="px-2 py-2 text-sm text-[#C8662B] underline" href={route('space.projects.create')}>+ Nouveau projet</Link>
+                                <Link className="px-2 py-2 text-sm text-[#B05A26] underline" href={route('space.projects.create')}>+ Nouveau projet</Link>
                             </div>
                         )}
                     </section>
@@ -75,7 +75,7 @@ export default function Funnel({ projects, slots, packages, credits, pending, qu
                             <h2 className="mb-2 text-lg font-bold">2. Mode de passage</h2>
                             <div className="grid gap-3 md:grid-cols-2">
                                 {(['SUR_PLACE', 'A_DISTANCE'] as const).map((m) => (
-                                    <button key={m} onClick={() => nav({ mode: m, slot: undefined })} className={`rounded-lg border p-4 text-left ${mode === m ? 'border-[#C8662B] ring-2 ring-[#C8662B]' : 'bg-white'}`}>
+                                    <button key={m} onClick={() => nav({ mode: m, slot: undefined })} className={`rounded-lg border p-4 text-left ${mode === m ? 'border-[#B05A26] ring-2 ring-[#B05A26]' : 'bg-white'}`}>
                                         <div className="font-bold">{MODE_LABEL[m]}</div>
                                         <div className="text-sm text-neutral-600">{m === 'SUR_PLACE' ? 'Au studio OCD Live, au Togo.' : 'Depuis chez vous, invité sur le live TikTok.'}</div>
                                     </button>
@@ -83,7 +83,7 @@ export default function Funnel({ projects, slots, packages, credits, pending, qu
                             </div>
                             {needs_tiktok && (
                                 <Card className="mt-3 border-amber-300 bg-amber-50 text-sm">
-                                    Le mode à distance nécessite votre pseudo TikTok. <Link className="text-[#C8662B] underline" href={route('profile.edit')}>Compléter mon profil</Link>
+                                    Le mode à distance nécessite votre pseudo TikTok. <Link className="text-[#B05A26] underline" href={route('profile.edit')}>Compléter mon profil</Link>
                                 </Card>
                             )}
                         </section>

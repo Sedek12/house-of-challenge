@@ -24,7 +24,7 @@ export default function ProjectPage({ project: p }: { project: Project }) {
                     <div>
                         <h1 className="text-2xl font-bold">{p.title}</h1>
                         <div className="text-sm text-neutral-500">{p.sector} · {p.country} · par {p.owner}</div>
-                        {p.presented_at && <div className="mt-1 text-sm font-medium text-[#C8662B]">Présenté à House of Challenge le {fmtDay(p.presented_at)}</div>}
+                        {p.presented_at && <div className="mt-1 text-sm font-medium text-[#B05A26]">Présenté à House of Challenge le {fmtDay(p.presented_at)}</div>}
                     </div>
                 </div>
                 <p className="mt-4 font-medium">{p.short_pitch}</p>
@@ -32,7 +32,7 @@ export default function ProjectPage({ project: p }: { project: Project }) {
                 {p.needs && p.needs.length > 0 && <p className="mt-3 text-sm"><b>Besoins :</b> {p.needs.join(', ')}</p>}
                 {p.links && (
                     <ul className="mt-3 flex flex-wrap gap-3 text-sm">
-                        {Object.entries(p.links).map(([k, v]) => <li key={k}><a className="text-[#C8662B] underline" href={v} target="_blank" rel="noopener noreferrer nofollow">{k}</a></li>)}
+                        {Object.entries(p.links).map(([k, v]) => <li key={k}><a className="text-[#B05A26] underline" href={v} target="_blank" rel="noopener noreferrer nofollow">{k}</a></li>)}
                     </ul>
                 )}
                 {p.image_urls?.length ? <div className="mt-4 grid grid-cols-3 gap-2">{p.image_urls.map((u) => <img key={u} src={u} alt="" loading="lazy" className="rounded" />)}</div> : null}

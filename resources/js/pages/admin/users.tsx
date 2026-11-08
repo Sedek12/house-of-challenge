@@ -18,7 +18,7 @@ export default function Users({ users, filters }: { users: { data: U[]; links: n
             <Head title="Utilisateurs" />
             <form onSubmit={(e) => { e.preventDefault(); router.get(route('admin.users'), q ? { q } : {}); }} className="mb-4 flex gap-2">
                 <input aria-label="Recherche" className={inputCls} placeholder="Nom ou e-mail" value={q} onChange={(e) => setQ(e.target.value)} />
-                <button className="rounded-md bg-[#C8662B] px-4 text-white">Rechercher</button>
+                <button className="rounded-md bg-[#B05A26] px-4 text-white">Rechercher</button>
             </form>
             <div className="overflow-x-auto rounded-lg border bg-white">
                 <table className="w-full text-left text-sm">

@@ -22,8 +22,8 @@ export default function Register() {
                 <div />
                 <Field label="Mot de passe" error={errors.password}><input type="password" className={inputCls} value={data.password} onChange={set('password')} required autoComplete="new-password" /></Field>
                 <Field label="Confirmer le mot de passe" error={errors.password_confirmation}><input type="password" className={inputCls} value={data.password_confirmation} onChange={set('password_confirmation')} required autoComplete="new-password" /></Field>
-                <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white disabled:opacity-60 md:col-span-2">Créer mon compte</button>
-                <p className="text-sm md:col-span-2">Déjà inscrit ? <Link className="text-[#C8662B] underline" href={route('login')}>Se connecter</Link></p>
+                <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white disabled:opacity-60 md:col-span-2">Créer mon compte</button>
+                <p className="text-sm md:col-span-2">Déjà inscrit ? <Link className="text-[#B05A26] underline" href={route('login')}>Se connecter</Link></p>
             </form>
         </SiteLayout>
     );

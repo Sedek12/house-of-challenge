@@ -14,13 +14,13 @@ export default function Home({ credits, next_expiry, upcoming }: { credits: numb
             {!auth.user.email_verified_at && (
                 <Card className="mb-4 border-amber-300 bg-amber-50 text-sm">
                     Vérifiez votre e-mail (nécessaire pour la publication de votre projet).{' '}
-                    <Link method="post" as="button" href={route('verification.send')} className="text-[#C8662B] underline">Renvoyer le lien</Link>
+                    <Link method="post" as="button" href={route('verification.send')} className="text-[#B05A26] underline">Renvoyer le lien</Link>
                 </Card>
             )}
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <div className="text-sm text-neutral-500">Crédits de passage</div>
-                    <div className="text-4xl font-extrabold text-[#C8662B]">{credits}</div>
+                    <div className="text-4xl font-extrabold text-[#B05A26]">{credits}</div>
                     {next_expiry && <div className="text-xs text-neutral-500">Prochaine expiration : {new Date(next_expiry).toLocaleDateString('fr-FR')}</div>}
                     <Button asChild variant="outline" size="sm" className="mt-3"><Link href={route('packages')}>Acheter des crédits</Link></Button>
                 </Card>

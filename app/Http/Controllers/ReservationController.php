@@ -116,6 +116,11 @@ class ReservationController extends Controller
     {
         $payment = Payment::with('purchase')->findOrFail($request->query('payment'));
         abort_unless($payment->purchase->user_id === $request->user()->id, 403);
+        // Webhook déjà traité avant le retour du navigateur : aller directement à la confirmation.
+        if ($payment->status === 'PAYE' && $payment->booking_id
+            && Booking::whereKey($payment->booking_id)->where('status', 'CONFIRMEE')->exists()) {
+            return redirect()->route('reserve.confirmation', $payment->booking_id);
+        }
 
         return Inertia::render('payment/return', ['payment_id' => $payment->id, 'status' => $payment->status, 'booking_id' => $payment->booking_id]);
     }

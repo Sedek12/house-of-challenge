@@ -45,7 +45,7 @@ export default function ProjectForm({ project, sectors, stages, needs }: { proje
                 </Field>
                 <Field label="Logo (≤ 2 Mo)" error={err.logo}><input type="file" accept="image/*" onChange={(e) => setData('logo', e.target.files?.[0] ?? null)} /></Field>
                 <Field label="Images (3 max, ≤ 2 Mo)" error={err.images}><input type="file" accept="image/*" multiple onChange={(e) => setData('images', Array.from(e.target.files ?? []).slice(0, 3))} /></Field>
-                <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white disabled:opacity-60">Enregistrer</button>
+                <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white disabled:opacity-60">Enregistrer</button>
             </form>
         </SiteLayout>
     );

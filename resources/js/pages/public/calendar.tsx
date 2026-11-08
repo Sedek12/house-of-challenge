@@ -12,7 +12,7 @@ export default function Calendar({ slots }: { slots: SlotDto[] }) {
             <Head title="Calendrier" />
             <div className="mb-4 flex gap-2">
                 {[['', 'Tous'], ['SUR_PLACE', 'Sur place'], ['A_DISTANCE', 'À distance']].map(([v, l]) => (
-                    <button key={v} onClick={() => setMode(v)} className={`rounded-md border px-3 py-1 text-sm ${mode === v ? 'bg-[#C8662B] text-white' : 'bg-white'}`}>{l}</button>
+                    <button key={v} onClick={() => setMode(v)} className={`rounded-md border px-3 py-1 text-sm ${mode === v ? 'bg-[#B05A26] text-white' : 'bg-white'}`}>{l}</button>
                 ))}
             </div>
             <SlotPicker slots={filtered} />

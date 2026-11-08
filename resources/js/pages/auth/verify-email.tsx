@@ -10,7 +10,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                 <p>Cliquez sur le lien que nous venons de vous envoyer par e-mail pour vérifier votre adresse.</p>
                 {status === 'verification-link-sent' && <p className="mt-3 font-medium text-green-700">Un nouveau lien a été envoyé.</p>}
                 <form onSubmit={(e) => { e.preventDefault(); post(route('verification.send')); }} className="mt-4 flex items-center gap-4">
-                    <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white disabled:opacity-60">Renvoyer le lien</button>
+                    <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white disabled:opacity-60">Renvoyer le lien</button>
                     <Link method="post" as="button" href={route('logout')} className="underline">Déconnexion</Link>
                 </form>
             </div>

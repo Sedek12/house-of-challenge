@@ -24,7 +24,7 @@ export default function Session({ session, rows }: { session: { id: number; titl
                         {rows.map((r) => (
                             <tr key={r.id} className="border-t">
                                 <td className="p-2 font-semibold">{fmtTime(r.starts_at)}</td>
-                                <td className="p-2"><Link className="text-[#C8662B] underline" href={route('team.booking', r.id)}>{r.name}</Link></td>
+                                <td className="p-2"><Link className="text-[#B05A26] underline" href={route('team.booking', r.id)}>{r.name}</Link></td>
                                 <td className="p-2">{r.project}</td>
                                 <td className="p-2"><ModeBadge mode={r.mode} /></td>
                                 <td className="p-2">{r.tiktok ? <a className="underline" target="_blank" rel="noreferrer" href={`https://www.tiktok.com/@${r.tiktok}`}>@{r.tiktok}</a> : '—'}</td>

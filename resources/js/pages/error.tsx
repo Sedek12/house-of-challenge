@@ -16,10 +16,10 @@ export default function ErrorPage({ status }: { status: number }) {
         <SiteLayout>
             <Head title={title} />
             <div className="py-16 text-center">
-                <div className="text-6xl font-extrabold text-[#C8662B]">{status}</div>
+                <div className="text-6xl font-extrabold text-[#B05A26]">{status}</div>
                 <h1 className="mt-2 text-2xl font-bold">{title}</h1>
                 <p className="mt-2 text-neutral-600">{text}</p>
-                <Link href={route('home')} className="mt-6 inline-block rounded-md bg-[#C8662B] px-4 py-2 text-white">Retour à l’accueil</Link>
+                <Link href={route('home')} className="mt-6 inline-block rounded-md bg-[#B05A26] px-4 py-2 text-white">Retour à l’accueil</Link>
             </div>
         </SiteLayout>
     );

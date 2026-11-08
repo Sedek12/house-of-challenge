@@ -20,7 +20,7 @@ export default function Dashboard({ stats, sessions }: { stats: Stats; sessions:
             <div className="grid gap-2">{sessions.map((s) => <Card key={s.id} className="text-sm"><b>{s.title}</b> — {fmtLome(s.starts_at)}</Card>)}</div>
             <h2 className="mb-2 mt-8 font-bold">Exports CSV</h2>
             <div className="flex gap-3 text-sm">
-                {['reservations', 'paiements', 'participants'].map((t) => <a key={t} className="text-[#C8662B] underline" href={route('admin.export', t)}>{t}</a>)}
+                {['reservations', 'paiements', 'participants'].map((t) => <a key={t} className="text-[#B05A26] underline" href={route('admin.export', t)}>{t}</a>)}
             </div>
         </SiteLayout>
     );

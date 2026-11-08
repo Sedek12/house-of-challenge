@@ -21,8 +21,9 @@ Production : `SEED_DEMO=false` (ou `APP_ENV=production`) pour ne semer que admin
 
 | | |
 |---|---|
-| `php artisan test` | tests (MySQL, base `house_of_challenge_test` à créer) |
-| `npm run types` / `npx tsc --noEmit` | typage TypeScript |
+| `php artisan test` | tests unitaires/HTTP (MySQL, base `house_of_challenge_test` à créer) |
+| `npm run test:e2e` | tests E2E Playwright (`npx playwright install chromium` une fois). **Réinitialise la base de dev** (`migrate:fresh --seed`) |
+| `npm run typecheck` | typage TypeScript |
 | `npm run build` | build front |
 | `php artisan hoc:maintenance` | holds expirés, réconciliation paiements, rappels, expiration crédits/publications |
 | `php artisan schedule:work` | exécute le planificateur (toutes les 5 min) |
@@ -31,8 +32,29 @@ En production, appeler `/api/cron/maintenance` avec `Authorization: Bearer <CRON
 
 ## Paiement
 
-`PAYMENT_PROVIDER=mock` : la page `/paiement/mock` simule succès/échec (désactivée en production).
-Pour un vrai prestataire : implémenter `App\Services\Payments\PaymentProvider`, l'enregistrer dans `Providers::make()`, puis configurer dans son tableau de bord l'URL du webhook `https://<domaine>/api/webhooks/payment` et `PAYMENT_*` dans `.env`.
+| `PAYMENT_PROVIDER` | Usage |
+|---|---|
+| `mock` | Dev uniquement : `/paiement/mock` simule succès/échec. Interdit en production. |
+| `fedapay` | `PAYMENT_SECRET_KEY` (clé secrète), `PAYMENT_WEBHOOK_SECRET`, `PAYMENT_ENV=sandbox|live`. |
+| `cinetpay` | `PAYMENT_PUBLIC_KEY` = site_id, `PAYMENT_SECRET_KEY` = apikey. Le statut est toujours re-vérifié via l'API. |
+
+Les adaptateurs FedaPay et CinetPay suivent la documentation publique mais **n'ont pas encore été testés en sandbox** : faire un paiement sandbox complet avant la mise en production.
+
+## Déploiement (VPS avec Docker)
+
+1. Sur le serveur : `cp .env.production.example .env`, remplir les valeurs (`APP_KEY` via `php artisan key:generate --show`, mots de passe forts, `ADMIN_EMAIL`/`ADMIN_PASSWORD`, clés de paiement, SMTP, Cloudinary).
+2. `docker compose -f docker-compose.prod.yml --env-file .env up -d --build`
+   - `app` : migrations + seed (admin, formules, paramètres ; **aucune donnée de démo**), puis Apache sur le port 8080.
+   - `scheduler` : `schedule:work` (maintenance toutes les 5 min).
+   - `db` : MySQL 8.4 (volume persistant).
+3. Placer un reverse proxy HTTPS devant le port 8080 (Caddy : `votre-domaine.com { reverse_proxy localhost:8080 }`).
+4. Dans le tableau de bord du prestataire, déclarer l'URL de webhook `https://votre-domaine.com/api/webhooks/payment`.
+5. Tester un paiement en sandbox de bout en bout, puis `PAYMENT_ENV=live` après validation par le porteur du projet et `docker compose ... up -d`.
+
+Hébergement mutualisé sans Docker : `composer install --no-dev`, `npm ci && npm run build`, document root sur `public/`, `php artisan migrate --force && php artisan db:seed --force`, et une tâche cron `* * * * * php /chemin/artisan schedule:run`.
+
+### Créer un autre administrateur
+Admin → Utilisateurs → changer le rôle en `ADMIN` (action tracée dans le journal d'audit).
 
 ## Paiement manuel (espèces / transfert)
 

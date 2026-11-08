@@ -6,8 +6,8 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
+        <meta name="description" content="House of Challenge : présentez votre projet en live TikTok depuis le studio OCD Live (Togo) ou à distance. Réservez votre passage en ligne.">
+        <meta name="theme-color" content="#1F1F1F">
 
         @routes
         @viteReactRefresh

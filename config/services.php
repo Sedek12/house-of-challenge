@@ -35,6 +35,11 @@ return [
         ],
     ],
 
+    'upload' => [
+        'provider' => env('UPLOAD_PROVIDER', 'local'),
+        'cloudinary_url' => env('CLOUDINARY_URL'),
+    ],
+
     'cron_secret' => env('CRON_SECRET'),
 
     'payment' => [

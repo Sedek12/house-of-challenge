@@ -11,12 +11,17 @@ use App\Models\Slot;
 use App\Models\User;
 use App\Services\CreditService;
 use App\Services\MaintenanceService;
+use App\Services\Payments\CinetPayProvider;
 use App\Services\Payments\FedaPayProvider;
+use App\Services\Payments\Providers;
 use App\Services\PurchaseService;
 use App\Services\Settings;
+use App\Services\UploadService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
@@ -63,7 +68,7 @@ class HttpFlowTest extends TestCase
         $this->assertSame('CONFIRMEE', $booking->fresh()->status);
         $this->get("/reserver/confirmation/{$booking->id}")->assertOk();
         $this->get("/api/ics/{$booking->id}")->assertOk()->assertHeader('Content-Type', 'text/calendar; charset=utf-8');
-        $this->get('/paiement/retour?payment='.$payment->id)->assertOk();
+        $this->get('/paiement/retour?payment='.$payment->id)->assertRedirect("/reserver/confirmation/{$booking->id}");
         $this->getJson('/paiement/statut/'.$payment->id)->assertJson(['status' => 'PAYE']);
 
         foreach (['/espace', '/espace/reservations', '/espace/achats', '/espace/projets', '/espace/projets/nouveau', '/espace/publications', '/settings/profile'] as $u) {
@@ -187,5 +192,39 @@ class HttpFlowTest extends TestCase
         $this->assertSame(0, $m->notifyExpiringPublications());
 
         $this->get('/page-inexistante')->assertNotFound();
+    }
+
+    public function test_cloudinary_upload_is_signed(): void
+    {
+        config(['services.upload.provider' => 'cloudinary', 'services.upload.cloudinary_url' => 'cloudinary://KEY:SECRET@demo']);
+        Http::fake(['api.cloudinary.com/*' => Http::response(['secure_url' => 'https://res.cloudinary.com/demo/x.png'])]);
+
+        $url = UploadService::store(UploadedFile::fake()->image('logo.png'));
+
+        $this->assertSame('https://res.cloudinary.com/demo/x.png', $url);
+        Http::assertSent(function ($req) {
+            $ts = collect($req->data())->firstWhere('name', 'timestamp')['contents'] ?? null;
+            $sig = collect($req->data())->firstWhere('name', 'signature')['contents'] ?? null;
+
+            return str_contains($req->url(), '/v1_1/demo/image/upload') && $sig === sha1("folder=projects&timestamp={$ts}SECRET");
+        });
+    }
+
+    public function test_cinetpay_webhook_trusts_api_not_body(): void
+    {
+        Http::fake(['api-checkout.cinetpay.com/v2/payment/check' => Http::response(['data' => ['status' => 'ACCEPTED', 'amount' => '15000']])]);
+        $r = Request::create('/api/webhooks/payment', 'POST', ['cpm_trans_id' => 'HOC1T1', 'cpm_amount' => '1']);
+
+        $v = (new CinetPayProvider)->verifyWebhook($r);
+
+        $this->assertTrue($v['valid']);
+        $this->assertSame(15000, $v['event']['amount']); // montant de l'API, pas celui du corps
+    }
+
+    public function test_mock_provider_forbidden_in_production(): void
+    {
+        $this->app['env'] = 'production';
+        $this->expectException(\InvalidArgumentException::class);
+        Providers::make('mock');
     }
 }

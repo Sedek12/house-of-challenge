@@ -32,20 +32,20 @@ export default function SiteLayout({ children, portal, title }: PropsWithChildre
             <header className="sticky top-0 z-40 bg-[#1F1F1F] text-white print:hidden">
                 <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
                     <Link href={route('home')} className="text-lg font-bold">
-                        House of <span className="text-[#C8662B]">Challenge</span>
+                        House of <span className="text-[#D4733A]">Challenge</span>
                     </Link>
                     <nav className="hidden items-center gap-5 text-sm md:flex">
                         {publicNav.map(([label, name, params]) => (
-                            <Link key={label} href={route(name, params as never)} className="hover:text-[#C8662B]">{label}</Link>
+                            <Link key={label} href={route(name, params as never)} className="hover:text-[#D4733A]">{label}</Link>
                         ))}
                         <Button asChild size="sm"><Link href={route('reserve')}>Réserver mon passage</Link></Button>
                         {user ? (
                             <>
-                                <Link href={route(myPortal)} className="hover:text-[#C8662B]">{user.role === 'PARTICIPANT' ? 'Mon espace' : 'Back-office'}</Link>
+                                <Link href={route(myPortal)} className="hover:text-[#D4733A]">{user.role === 'PARTICIPANT' ? 'Mon espace' : 'Back-office'}</Link>
                                 <button onClick={() => router.post(route('logout'))} className="text-neutral-300 hover:text-white">Déconnexion</button>
                             </>
                         ) : (
-                            <Link href={route('login')} className="hover:text-[#C8662B]">Connexion</Link>
+                            <Link href={route('login')} className="hover:text-[#D4733A]">Connexion</Link>
                         )}
                     </nav>
                     <button className="md:hidden" aria-label="Menu" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
@@ -55,7 +55,7 @@ export default function SiteLayout({ children, portal, title }: PropsWithChildre
                         {publicNav.map(([label, name, params]) => (
                             <Link key={label} href={route(name, params as never)} onClick={() => setOpen(false)}>{label}</Link>
                         ))}
-                        <Link href={route('reserve')} className="font-semibold text-[#C8662B]">Réserver mon passage</Link>
+                        <Link href={route('reserve')} className="font-semibold text-[#D4733A]">Réserver mon passage</Link>
                         {user ? (
                             <>
                                 <Link href={route(myPortal)}>{user.role === 'PARTICIPANT' ? 'Mon espace' : 'Back-office'}</Link>
@@ -72,7 +72,7 @@ export default function SiteLayout({ children, portal, title }: PropsWithChildre
                 <div className="overflow-x-auto border-b bg-white print:hidden">
                     <div className="mx-auto flex max-w-6xl gap-1 px-4 text-sm">
                         {portals[portal].map(([label, name]) => (
-                            <Link key={name} href={route(name)} className={`whitespace-nowrap px-3 py-3 ${route().current(name + '*') ? 'border-b-2 border-[#C8662B] font-semibold' : 'text-neutral-600 hover:text-black'}`}>{label}</Link>
+                            <Link key={name} href={route(name)} className={`whitespace-nowrap px-3 py-3 ${route().current(name + '*') ? 'border-b-2 border-[#B05A26] font-semibold' : 'text-neutral-600 hover:text-black'}`}>{label}</Link>
                         ))}
                         {portal === 'admin' && (
                             <Link href={route('team.planning')} className="whitespace-nowrap px-3 py-3 text-neutral-600">Espace équipe</Link>

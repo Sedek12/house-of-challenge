@@ -37,7 +37,7 @@ function PackageForm({ initial, onDone }: { initial: Pkg; onDone: () => void }) 
                 ))}
                 {err.allowed_modes && <span className="text-red-600">{err.allowed_modes}</span>}
             </div>
-            <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white md:col-span-3">Enregistrer</button>
+            <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white md:col-span-3">Enregistrer</button>
         </form>
     );
 }
@@ -47,7 +47,7 @@ export default function Packages({ packages }: { packages: (Pkg & { id: number }
     return (
         <SiteLayout portal="admin" title="Formules">
             <Head title="Formules" />
-            <button className="mb-4 rounded-md bg-[#C8662B] px-4 py-2 text-sm text-white" onClick={() => setEditing('new')}>+ Nouvelle formule</button>
+            <button className="mb-4 rounded-md bg-[#B05A26] px-4 py-2 text-sm text-white" onClick={() => setEditing('new')}>+ Nouvelle formule</button>
             {editing === 'new' && <Card className="mb-4"><b>Nouvelle formule</b><PackageForm initial={EMPTY} onDone={() => setEditing(null)} /></Card>}
             <div className="grid gap-3">
                 {packages.map((p) => (

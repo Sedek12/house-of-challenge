@@ -24,7 +24,7 @@ export default function Bookings({ bookings, filters, users, projects, open_slot
                 </select>
                 <select aria-label="Mode" className={inputCls} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="">Tous modes</option><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select>
                 <input aria-label="À partir du" type="date" className={inputCls} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} />
-                <button className="rounded-md bg-[#C8662B] px-3 text-white">Filtrer</button>
+                <button className="rounded-md bg-[#B05A26] px-3 text-white">Filtrer</button>
             </form>
 
             <div className="overflow-x-auto rounded-lg border bg-white">
@@ -51,7 +51,7 @@ export default function Bookings({ bookings, filters, users, projects, open_slot
                     <Field label="Projet" error={err.project_id}><select className={inputCls} value={data.project_id} onChange={(e) => setData('project_id', e.target.value)} required><option value="" />{projects.filter((p) => String(p.user_id) === data.user_id).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
                     <Field label="Créneau" error={err.slot_id}><select className={inputCls} value={data.slot_id} onChange={(e) => setData('slot_id', e.target.value)} required><option value="" />{open_slots.map((s) => <option key={s.id} value={s.id}>{fmtLome(s.starts_at)}</option>)}</select></Field>
                     <Field label="Mode"><select className={inputCls} value={data.mode} onChange={(e) => setData('mode', e.target.value)}><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select></Field>
-                    <button disabled={processing} className="self-end rounded-md bg-[#C8662B] px-3 py-2 text-white">Créer</button>
+                    <button disabled={processing} className="self-end rounded-md bg-[#B05A26] px-3 py-2 text-white">Créer</button>
                 </form>
             </Card>
         </SiteLayout>

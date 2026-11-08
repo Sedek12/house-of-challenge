@@ -23,7 +23,7 @@ export default function Settings({ settings }: { settings: Record<string, string
                                 : <input className={inputCls} value={data.settings[k] ?? ''} onChange={(e) => setData('settings', { ...data.settings, [k]: e.target.value })} />}
                         </Field>
                     ))}
-                    <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white">Enregistrer</button>
+                    <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white">Enregistrer</button>
                 </form>
             </Card>
         </SiteLayout>

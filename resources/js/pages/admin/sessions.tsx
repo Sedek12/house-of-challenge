@@ -30,13 +30,13 @@ export default function Sessions({ sessions }: { sessions: { data: S[]; links: n
                             <label key={m}><input type="checkbox" checked={data.accepted_modes.includes(m)} onChange={(e) => setData('accepted_modes', e.target.checked ? [...data.accepted_modes, m] : data.accepted_modes.filter((x) => x !== m))} /> {m === 'SUR_PLACE' ? 'Sur place' : 'À distance'}</label>
                         ))}
                     </div>
-                    <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white md:col-span-4">Créer et générer les créneaux</button>
+                    <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white md:col-span-4">Créer et générer les créneaux</button>
                 </form>
             </Card>
             <div className="grid gap-2">
                 {sessions.data.map((s) => (
                     <Link key={s.id} href={route('admin.sessions.show', s.id)}>
-                        <Card className="flex flex-wrap items-center justify-between gap-2 hover:border-[#C8662B]">
+                        <Card className="flex flex-wrap items-center justify-between gap-2 hover:border-[#B05A26]">
                             <div><b>{s.title}</b><div className="text-sm">{fmtLome(s.starts_at)}</div></div>
                             <div className="flex items-center gap-2 text-sm">{s.booked_count}/{s.slots_count} réservés <StatusBadge status={s.status} /></div>
                         </Card>

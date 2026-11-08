@@ -16,7 +16,7 @@ export default function TeamBooking({ booking: b, project: p, notes, history }: 
     return (
         <SiteLayout portal="team" title={`Fiche de préparation — ${b.name}`}>
             <Head title="Fiche de préparation" />
-            <Link className="mb-3 inline-block text-sm text-[#C8662B] underline" href={route('team.session', b.session_id)}>← Retour à la session</Link>
+            <Link className="mb-3 inline-block text-sm text-[#B05A26] underline" href={route('team.session', b.session_id)}>← Retour à la session</Link>
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
                     <div className="mb-2 flex gap-2"><ModeBadge mode={b.mode} /><StatusBadge status={b.status} /></div>

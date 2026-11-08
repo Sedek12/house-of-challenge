@@ -23,7 +23,7 @@ export default function ProfilePage({ profile }: { profile: Profile }) {
                 <Field label="Ville" error={errors.city}><input className={inputCls} value={data.city} onChange={set('city')} /></Field>
                 <Field label="Pseudo TikTok" error={errors.tiktok_username}><input className={inputCls} value={data.tiktok_username} onChange={set('tiktok_username')} /></Field>
                 <div />
-                <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white md:col-span-2">Enregistrer</button>
+                <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white md:col-span-2">Enregistrer</button>
             </form>
 
             <Card className="mt-6 max-w-2xl border-red-200">

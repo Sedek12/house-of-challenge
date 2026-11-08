@@ -17,7 +17,7 @@ export default function Projects({ projects, filters, sectors }: { projects: { d
                     {sectors.map((s) => <option key={s}>{s}</option>)}
                 </select>
                 <input aria-label="Pays" className={inputCls} placeholder="Pays" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })} />
-                <button className="rounded-md bg-[#C8662B] px-4 py-2 text-sm text-white">Filtrer</button>
+                <button className="rounded-md bg-[#B05A26] px-4 py-2 text-sm text-white">Filtrer</button>
             </form>
             {projects.data.length === 0 && <p className="text-neutral-600">Aucun projet publié pour le moment.</p>}
             <div className="grid gap-4 md:grid-cols-3">{projects.data.map((p: { id: number }) => <ProjectCard key={p.id} p={p as never} />)}</div>

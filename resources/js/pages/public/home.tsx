@@ -12,7 +12,7 @@ export default function Home({ packages, sessions, projects }: { packages: Pkg[]
         <SiteLayout>
             <Head title="Accueil" />
             <section className="rounded-xl bg-[#1F1F1F] px-6 py-12 text-center text-white">
-                <h1 className="text-3xl font-extrabold md:text-5xl">Présentez votre projet en <span className="text-[#C8662B]">live</span></h1>
+                <h1 className="text-3xl font-extrabold md:text-5xl">Présentez votre projet en <span className="text-[#D4733A]">live</span></h1>
                 <p className="mx-auto mt-4 max-w-2xl text-neutral-300">
                     House of Challenge, l’émission TikTok de Bovann tournée au studio OCD Live (Togo). Faites interviewer votre projet devant des milliers de spectateurs — sur place ou depuis chez vous.
                 </p>
@@ -26,7 +26,7 @@ export default function Home({ packages, sessions, projects }: { packages: Pkg[]
                 <h2 className="mb-4 text-xl font-bold">Comment ça marche</h2>
                 <div className="grid gap-3 md:grid-cols-4">
                     {steps.map((s, i) => (
-                        <Card key={i}><div className="text-2xl font-extrabold text-[#C8662B]">{i + 1}</div><p className="text-sm">{s}</p></Card>
+                        <Card key={i}><div className="text-2xl font-extrabold text-[#B05A26]">{i + 1}</div><p className="text-sm">{s}</p></Card>
                     ))}
                 </div>
             </section>
@@ -62,7 +62,7 @@ export default function Home({ packages, sessions, projects }: { packages: Pkg[]
 export function ProjectCard({ p }: { p: P }) {
     return (
         <Link href={route('projects.show', { slug: p.slug })}>
-            <Card className="h-full hover:border-[#C8662B]">
+            <Card className="h-full hover:border-[#B05A26]">
                 {p.logo_url && <img src={p.logo_url} alt="" loading="lazy" className="mb-2 h-16 w-16 rounded object-cover" />}
                 <div className="font-bold">{p.title}</div>
                 <div className="text-xs text-neutral-500">{p.sector} · {p.country}</div>

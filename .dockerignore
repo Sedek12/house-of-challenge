@@ -1,0 +1,16 @@
+vendor
+node_modules
+public/build
+public/storage
+.env
+.env.*
+!.env.example
+!.env.production.example
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+tests/e2e
+test-results
+playwright-report
+.git

@@ -11,8 +11,8 @@ export default function ForgotPassword({ status }: { status?: string }) {
             <form onSubmit={(e) => { e.preventDefault(); post(route('password.email')); }} className="grid max-w-md gap-3 rounded-lg border bg-white p-5">
                 <p className="text-sm text-neutral-600">Saisissez votre e-mail : nous vous enverrons un lien de réinitialisation (valable 1 heure).</p>
                 <Field label="E-mail" error={errors.email}><input type="email" className={inputCls} value={data.email} onChange={(e) => setData('email', e.target.value)} required autoFocus /></Field>
-                <button disabled={processing} className="rounded-md bg-[#C8662B] px-4 py-2 text-white disabled:opacity-60">Envoyer le lien</button>
-                <Link className="text-sm text-[#C8662B] underline" href={route('login')}>Retour à la connexion</Link>
+                <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white disabled:opacity-60">Envoyer le lien</button>
+                <Link className="text-sm text-[#B05A26] underline" href={route('login')}>Retour à la connexion</Link>
             </form>
         </SiteLayout>
     );

@@ -27,7 +27,7 @@ export default function Publications({ publications, projects, email_verified }:
                                     <option value="">Choisir un projet…</option>
                                     {projects.map((pr) => <option key={pr.id} value={pr.id}>{pr.title}</option>)}
                                 </select>
-                                <button className="rounded-md bg-[#C8662B] px-3 text-sm text-white" onClick={() => choice[p.id] && router.post(route('space.publications.choose', p.id), { project_id: choice[p.id] })}>Soumettre</button>
+                                <button className="rounded-md bg-[#B05A26] px-3 text-sm text-white" onClick={() => choice[p.id] && router.post(route('space.publications.choose', p.id), { project_id: choice[p.id] })}>Soumettre</button>
                             </div>
                         )}
                     </Card>

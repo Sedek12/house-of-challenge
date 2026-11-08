@@ -17,12 +17,17 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Admin : identifiants issus de l'environnement.
-        $admin = User::firstOrNew(['email' => env('ADMIN_EMAIL', 'admin@houseofchallenge.test')]);
+        // Admin : identifiants issus de l'environnement ; jamais de valeurs par défaut en production.
+        $email = env('ADMIN_EMAIL');
+        $password = env('ADMIN_PASSWORD');
+        if (app()->isProduction() && (! $email || ! $password)) {
+            throw new \RuntimeException('ADMIN_EMAIL et ADMIN_PASSWORD sont obligatoires en production.');
+        }
+        $admin = User::firstOrNew(['email' => $email ?: 'admin@houseofchallenge.test']);
         $admin->forceFill([
             'name' => 'Administrateur', 'first_name' => 'Admin', 'last_name' => 'HOC', 'phone_e164' => '+22800000000',
-            'country' => 'Togo', 'role' => 'ADMIN', 'is_active' => true, 'email_verified_at' => now(),
-            'password' => $admin->exists ? $admin->password : Hash::make(env('ADMIN_PASSWORD', 'Admin#12345')),
+            'country' => 'Togo', 'role' => 'ADMIN', 'is_active' => true, 'email_verified_at' => $admin->email_verified_at ?? now(),
+            'password' => $admin->exists ? $admin->password : Hash::make($password ?: 'Admin#12345'),
         ])->save();
 
         // Formules (exemples à confirmer : modifiables depuis l'admin).

@@ -9,8 +9,8 @@ use App\Models\Publication;
 use App\Services\BookingService;
 use App\Services\CreditService;
 use App\Services\Settings;
+use App\Services\UploadService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class ParticipantController extends Controller
@@ -135,10 +135,10 @@ class ParticipantController extends Controller
         $data = collect($d)->except('logo', 'images')->all();
         $data['links'] = array_filter($d['links'] ?? []);
         if ($request->hasFile('logo')) {
-            $data['logo_url'] = Storage::url($request->file('logo')->store('projects', 'public'));
+            $data['logo_url'] = UploadService::store($request->file('logo'));
         }
         if ($request->hasFile('images')) {
-            $data['image_urls'] = collect($request->file('images'))->map(fn ($f) => Storage::url($f->store('projects', 'public')))->all();
+            $data['image_urls'] = collect($request->file('images'))->map(fn ($f) => UploadService::store($f))->all();
         }
         if ($project) {
             $project->update($data);

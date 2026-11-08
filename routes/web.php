@@ -96,6 +96,18 @@ Route::get('dashboard', fn () => redirect()->route('space.home'))->middleware('a
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
 
+Route::get('/robots.txt', fn () => response(
+    'User-agent: *
+Disallow: /admin
+Disallow: /equipe
+Disallow: /espace
+Disallow: /api
+Disallow: /paiement
+Sitemap: '.url('/sitemap.xml').'
+',
+    200, ['Content-Type' => 'text/plain']
+));
+
 Route::get('/sitemap.xml', function () {
     $urls = collect(['home', 'packages', 'calendar', 'projects', 'contact'])->map(fn ($r) => route($r))
         ->merge(Project::publiclyVisible()->pluck('slug')->map(fn ($s) => route('projects.show', $s)));
