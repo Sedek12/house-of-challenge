@@ -9,7 +9,8 @@ use Illuminate\Mail\Mailables\Envelope;
 
 class GenericMail extends Mailable
 {
-    public function __construct(public string $mailSubject, public array $lines, public ?array $file = null) {}
+    /** @param array{label:string,url:string}|null $action bouton affiché sous le message */
+    public function __construct(public string $mailSubject, public array $lines, public ?array $file = null, public ?array $action = null) {}
 
     public function envelope(): Envelope
     {

@@ -9,7 +9,7 @@ class HocMaintenance extends Command
 {
     protected $signature = 'hoc:maintenance';
 
-    protected $description = 'Libère les holds, réconcilie les paiements, envoie les rappels, fait expirer crédits et publications';
+    protected $description = 'Libère les créneaux bloqués dont le paiement a expiré et réconcilie les paiements en attente';
 
     public function handle(MaintenanceService $m): int
     {

@@ -2,23 +2,21 @@
 
 namespace App\Models;
 
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements MustVerifyEmail
+/** Comptes de l'équipe OCD uniquement (administrateur, animateur). Les vendeurs n'ont pas de compte. */
+class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    public const ROLES = ['PARTICIPANT', 'INTERVIEWER', 'ADMIN'];
+    public const ROLES = ['INTERVIEWER', 'ADMIN', 'VENDOR'];
 
-    protected $fillable = [
-        'name', 'first_name', 'last_name', 'email', 'phone_e164', 'country', 'city',
-        'tiktok_username', 'password',
-    ];
+    protected $fillable = ['name', 'first_name', 'last_name', 'email', 'phone_e164', 'country', 'city', 'password'];
 
+    /** Staff = équipe OCD ; les comptes VENDOR (vendeurs) n'ont accès qu'à leur espace. */
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
@@ -40,28 +38,13 @@ class User extends Authenticatable implements MustVerifyEmail
         return in_array($this->role, ['ADMIN', 'INTERVIEWER'], true);
     }
 
-    public static function normalizeTiktok(?string $v): ?string
+    public function shops(): HasMany
     {
-        if ($v === null) {
-            return null;
-        }
-        $v = strtolower(preg_replace('/[\s@]+/', '', $v));
-
-        return $v === '' ? null : $v;
+        return $this->hasMany(Shop::class);
     }
 
-    public function projects(): HasMany
+    public function isVendor(): bool
     {
-        return $this->hasMany(Project::class);
-    }
-
-    public function purchases(): HasMany
-    {
-        return $this->hasMany(Purchase::class);
-    }
-
-    public function bookings(): HasMany
-    {
-        return $this->hasMany(Booking::class);
+        return $this->role === 'VENDOR';
     }
 }

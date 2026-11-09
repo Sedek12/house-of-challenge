@@ -5,68 +5,120 @@ namespace App\Services;
 use App\Exceptions\BusinessException;
 use App\Models\Booking;
 use App\Models\LiveSession;
-use App\Models\Project;
+use App\Models\Package;
+use App\Models\Product;
 use App\Models\Slot;
-use App\Models\User;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 class BookingService
 {
-    public function __construct(private SlotService $slots, private CreditService $credits) {}
+    private const TAKEN = 'Ce créneau vient d\'être pris, choisissez-en un autre.';
 
-    private function assertSlotBookable(Slot $slot, string $mode, User $user): void
+    public function __construct(private SlotService $slots) {}
+
+    private function assertSlotBookable(Slot $slot, string $mode): void
     {
         $session = $slot->session;
         if ($session->status !== 'PROGRAMMEE' || $slot->starts_at->lte(now())) {
             throw new BusinessException('Ce créneau n\'est plus disponible.');
         }
         if (! in_array($mode, $session->accepted_modes ?? [], true)) {
-            throw new BusinessException('Ce mode de passage n\'est pas accepté pour cette session.');
-        }
-        if ($mode === 'A_DISTANCE' && ! $user->tiktok_username) {
-            throw new BusinessException('Renseignez votre pseudo TikTok dans votre profil pour passer à distance.');
+            throw new BusinessException('Ce mode de passage n\'est pas proposé pour ce live.');
         }
     }
 
-    private function futureActiveCount(User $user): int
+    /** Traduit la violation de l'index unique `active_slot_id` en message métier. */
+    private function guardDuplicate(\Closure $work): mixed
     {
-        return Booking::where('user_id', $user->id)->whereIn('status', Booking::ACTIVE)
-            ->whereHas('slot', fn ($q) => $q->where('starts_at', '>', now()))->count();
+        try {
+            return $work();
+        } catch (QueryException $e) {
+            if (($e->errorInfo[1] ?? null) === 1062) {
+                throw new BusinessException(self::TAKEN);
+            }
+            throw $e;
+        }
     }
 
-    /** Pose un hold sur le créneau et crée la réservation ; la confirme immédiatement si un crédit existe. */
-    public function start(User $user, Project $project, int $slotId, string $mode): Booking
+    /**
+     * Crée la réservation : bloque le créneau (F3), enregistre le vendeur et ses produits (F4, F5).
+     *
+     * @param  array<string, mixed>  $data  full_name, phone, email, shop_name, city, tiktok, host_notes, mode
+     * @param  array<int, array{name:string,price:int,live_price:int,quantity:int,photo?:?UploadedFile}>  $products
+     */
+    public function start(Package $pkg, int $slotId, array $data, array $products): Booking
     {
-        if ($project->user_id !== $user->id) {
-            throw new BusinessException('Projet introuvable.');
+        if (! $pkg->is_active) {
+            throw new BusinessException('Ce package n\'est plus disponible.');
+        }
+        if (count($products) < 1 || count($products) > $pkg->max_products) {
+            throw new BusinessException("Ce package permet de 1 à {$pkg->max_products} produit(s).");
         }
         $slot = Slot::with('session')->findOrFail($slotId);
-        $this->assertSlotBookable($slot, $mode, $user);
+        $this->assertSlotBookable($slot, $data['mode']);
 
-        // Abandonner d'éventuelles réservations en attente de paiement de cet utilisateur.
-        Booking::where('user_id', $user->id)->where('status', 'EN_ATTENTE_PAIEMENT')->with('slot')->get()
-            ->each(fn (Booking $b) => $this->cancel($b, true, 'Nouvelle réservation commencée'));
+        $this->slots->releaseIfExpired($slot->id);
 
-        if ($this->futureActiveCount($user) >= Settings::int('max_future_bookings')) {
-            throw new BusinessException('Vous avez atteint le nombre maximum de réservations à venir ('.Settings::int('max_future_bookings').').');
-        }
-
-        $booking = DB::transaction(function () use ($user, $project, $slot, $mode) {
-            if (! $this->slots->hold($slot->id, $user->id)) {
-                throw new BusinessException('Ce créneau vient d\'être réservé, choisissez-en un autre.');
+        return $this->guardDuplicate(fn () => DB::transaction(function () use ($pkg, $slot, $data, $products) {
+            if (! $this->slots->hold($slot->id)) {
+                throw new BusinessException(self::TAKEN);
+            }
+            $booking = Booking::create([
+                ...$data, 'package_id' => $pkg->id, 'slot_id' => $slot->id, 'amount' => $pkg->price,
+                'status' => 'EN_ATTENTE_PAIEMENT', 'consent_at' => now(),
+            ]);
+            foreach (array_values($products) as $i => $r) {
+                $booking->products()->create([
+                    'name' => $r['name'], 'price' => $r['price'], 'live_price' => $r['live_price'], 'quantity' => $r['quantity'],
+                    'photo_path' => ! empty($r['photo']) ? UploadService::storeProductPhoto($r['photo']) : UploadService::duplicate($r['photo_from'] ?? null),
+                    'position' => $i,
+                ]);
             }
 
-            return Booking::create([
-                'user_id' => $user->id, 'project_id' => $project->id, 'slot_id' => $slot->id,
-                'mode' => $mode, 'status' => 'EN_ATTENTE_PAIEMENT',
-            ]);
-        });
+            return $booking;
+        }));
+    }
 
-        if ($this->credits->consume($user, $booking)) {
-            $this->confirm($booking);
+    public function editDeadlinePassed(Booking $b): bool
+    {
+        return now()->gt($b->slot->starts_at->copy()->subHours(Settings::int('edit_deadline_hours')));
+    }
+
+    /**
+     * Mise à jour par le vendeur via son lien de suivi (F9) : produits et consignes, jusqu'à 24 h avant le live.
+     *
+     * @param  array<int, array{id?:?int,name:string,price:int,live_price:int,quantity:int,photo?:?UploadedFile}>  $rows
+     */
+    public function updateFromTracking(Booking $booking, array $rows, ?string $hostNotes): void
+    {
+        if (! in_array($booking->status, Booking::ACTIVE, true) || $this->editDeadlinePassed($booking)) {
+            throw new BusinessException('Les modifications sont closes '.Settings::int('edit_deadline_hours').' h avant le live.');
+        }
+        $max = $booking->package->max_products;
+        if (count($rows) < 1 || count($rows) > $max) {
+            throw new BusinessException("Ce package permet de 1 à {$max} produit(s).");
         }
 
-        return $booking->fresh();
+        DB::transaction(function () use ($booking, $rows, $hostNotes) {
+            $booking->update(['host_notes' => $hostNotes]);
+            $existing = $booking->products()->get()->keyBy('id');
+            $keep = [];
+            foreach (array_values($rows) as $i => $r) {
+                $product = ! empty($r['id']) ? $existing->get((int) $r['id']) : null;
+                $fields = ['name' => $r['name'], 'price' => $r['price'], 'live_price' => $r['live_price'], 'quantity' => $r['quantity'], 'position' => $i];
+                if (! empty($r['photo'])) {
+                    UploadService::delete($product?->photo_path);
+                    $fields['photo_path'] = UploadService::storeProductPhoto($r['photo']);
+                }
+                $keep[] = $product ? tap($product)->update($fields)->id : $booking->products()->create($fields)->id;
+            }
+            $booking->products()->whereNotIn('id', $keep)->get()->each(function (Product $p) {
+                UploadService::delete($p->photo_path);
+                $p->delete();
+            });
+        });
     }
 
     public function confirm(Booking $booking): Booking
@@ -77,67 +129,57 @@ class BookingService
                 return;
             }
             $booking->update(['status' => 'CONFIRMEE']);
-            $booking->slot->update(['status' => 'RESERVE', 'hold_expires_at' => null, 'held_by_user_id' => $booking->user_id]);
+            $booking->slot->update(['status' => 'RESERVE', 'hold_expires_at' => null]);
         });
         $booking->refresh();
         if ($booking->status === 'CONFIRMEE') {
             Notifier::bookingConfirmed($booking);
+            Notifier::newBookingAlert($booking);
         }
 
         return $booking;
     }
 
-    public function deadlinePassed(Booking $b): bool
-    {
-        return now()->gt($b->slot->starts_at->copy()->subHours(Settings::int('cancel_deadline_hours')));
-    }
-
-    public function cancel(Booking $booking, bool $byStaff = false, ?string $reason = null): Booking
+    /** Annulation (A9) ou échec de paiement : le créneau est libéré immédiatement. Le remboursement se fait hors du site. */
+    public function cancel(Booking $booking, ?string $reason = null): Booking
     {
         if (! in_array($booking->status, Booking::ACTIVE, true)) {
             throw new BusinessException('Cette réservation ne peut plus être annulée.');
         }
-        $late = $this->deadlinePassed($booking);
-        if ($late && ! $byStaff && $booking->status === 'CONFIRMEE') {
-            throw new BusinessException('Le délai d\'annulation ('.Settings::int('cancel_deadline_hours').' h avant le passage) est dépassé.');
-        }
-
+        $wasConfirmed = $booking->status === 'CONFIRMEE';
         DB::transaction(function () use ($booking, $reason) {
             $booking->update(['status' => 'ANNULEE', 'cancelled_at' => now(), 'cancel_reason' => $reason]);
             $this->slots->release($booking->slot);
-            $this->credits->refund($booking);
         });
-
-        if ($booking->wasChanged('status') && $booking->getOriginal('status') === 'CONFIRMEE' && ! $byStaff) {
-            Notifier::bookingCancelled($booking, 'Votre crédit vous a été rendu.');
+        if ($wasConfirmed) {
+            Notifier::bookingCancelled($booking, 'Pour tout remboursement, contactez-nous sur WhatsApp.');
         }
 
         return $booking->fresh();
     }
 
+    /** Déplace une réservation confirmée vers un autre créneau libre (A9). */
     public function reschedule(Booking $booking, int $newSlotId): Booking
     {
         if ($booking->status !== 'CONFIRMEE') {
             throw new BusinessException('Seule une réservation confirmée peut être reportée.');
         }
-        if ($this->deadlinePassed($booking)) {
-            throw new BusinessException('Le délai pour reporter est dépassé.');
-        }
         $new = Slot::with('session')->findOrFail($newSlotId);
-        $this->assertSlotBookable($new, $booking->mode, $booking->user);
+        $this->assertSlotBookable($new, $booking->mode);
 
-        DB::transaction(function () use ($booking, $new) {
-            if (! $this->slots->hold($new->id, $booking->user_id)) {
-                throw new BusinessException('Ce créneau vient d\'être réservé, choisissez-en un autre.');
+        $this->slots->releaseIfExpired($new->id);
+        $this->guardDuplicate(fn () => DB::transaction(function () use ($booking, $new) {
+            if (! $this->slots->hold($new->id)) {
+                throw new BusinessException(self::TAKEN);
             }
             $old = $booking->slot;
+            $booking->update(['slot_id' => $new->id]);
             $new->update(['status' => 'RESERVE', 'hold_expires_at' => null]);
-            $booking->update(['slot_id' => $new->id, 'reminder_24h_sent' => false, 'reminder_2h_sent' => false]);
             $this->slots->release($old);
-        });
+        }));
 
         $booking->refresh();
-        Notifier::bookingConfirmed($booking);
+        Notifier::bookingConfirmed($booking, 'Votre passage a été déplacé.');
 
         return $booking;
     }
@@ -149,22 +191,22 @@ class BookingService
             $session->update(['status' => 'ANNULEE']);
             Booking::whereIn('status', Booking::ACTIVE)
                 ->whereHas('slot', fn ($q) => $q->where('live_session_id', $session->id))
-                ->with('slot', 'user')->get()
+                ->with('slot')->get()
                 ->each(function (Booking $b) use (&$n) {
-                    $b->update(['status' => 'ANNULEE_PAR_ORGANISATEUR', 'cancelled_at' => now(), 'cancel_reason' => 'Session annulée']);
-                    $this->credits->refund($b);
-                    Notifier::bookingCancelled($b, 'La session a été annulée par l\'organisation. Votre crédit vous a été rendu, vous pouvez choisir une nouvelle date.');
+                    $b->update(['status' => 'ANNULEE', 'cancelled_at' => now(), 'cancel_reason' => 'Live annulé par l\'organisation']);
+                    Notifier::bookingCancelled($b, 'Le live a été annulé par l\'organisation. Contactez-nous sur WhatsApp pour choisir une nouvelle date ou être remboursé.');
                     $n++;
                 });
-            $session->slots()->update(['status' => 'BLOQUE', 'hold_expires_at' => null, 'held_by_user_id' => null]);
+            $session->slots()->update(['status' => 'BLOQUE', 'hold_expires_at' => null]);
         });
 
         return $n;
     }
 
+    /** « Live effectué » ou « Absent » (A5), par l'administrateur. */
     public function mark(Booking $booking, string $status): Booking
     {
-        if (! in_array($status, ['EFFECTUEE', 'ABSENT'], true) || $booking->status !== 'CONFIRMEE' && ! in_array($booking->status, ['EFFECTUEE', 'ABSENT'], true)) {
+        if (! in_array($status, ['EFFECTUEE', 'ABSENT'], true) || ! in_array($booking->status, ['CONFIRMEE', 'EFFECTUEE', 'ABSENT'], true)) {
             throw new BusinessException('Statut invalide pour cette réservation.');
         }
         $booking->update(['status' => $status]);

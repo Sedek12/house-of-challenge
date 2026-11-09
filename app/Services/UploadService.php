@@ -3,36 +3,68 @@
 namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
-/** Stockage des images : disque local (dev) ou Cloudinary (UPLOAD_PROVIDER=cloudinary). */
+/** Images : redimensionnées et converties en WebP à l'envoi, pour des pages légères. */
 class UploadService
 {
-    public static function store(UploadedFile $file, string $folder = 'projects'): string
+    /** @return string chemin relatif sur le disque public */
+    public static function storeProductPhoto(UploadedFile $file): string
     {
-        return config('services.upload.provider') === 'cloudinary'
-            ? self::cloudinary($file, $folder)
-            : Storage::url($file->store($folder, 'public'));
+        return self::storeImage($file, 'products', 800, 78);
     }
 
-    private static function cloudinary(UploadedFile $file, string $folder): string
+    /** @return string chemin relatif sur le disque public */
+    public static function storeImage(UploadedFile $file, string $folder, int $maxSide, int $quality = 80): string
     {
-        // CLOUDINARY_URL=cloudinary://<api_key>:<api_secret>@<cloud_name>
-        $c = parse_url((string) config('services.upload.cloudinary_url'));
-        abort_unless(! empty($c['host']) && ! empty($c['user']) && ! empty($c['pass']), 500, 'CLOUDINARY_URL invalide.');
+        $img = self::load($file);
+        if ($img === null) {
+            // Format illisible par GD : on garde le fichier tel quel plutôt que de perdre l'image.
+            return $file->store($folder, 'public');
+        }
+        [$w, $h] = [imagesx($img), imagesy($img)];
+        $ratio = min(1, $maxSide / max($w, $h));
+        if ($ratio < 1) {
+            $img = imagescale($img, max(1, (int) round($w * $ratio)), max(1, (int) round($h * $ratio)));
+        }
+        imagepalettetotruecolor($img);
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        ob_start();
+        imagewebp($img, null, $quality);
+        $path = $folder.'/'.bin2hex(random_bytes(12)).'.webp';
+        Storage::disk('public')->put($path, ob_get_clean());
 
-        $params = ['folder' => $folder, 'timestamp' => time()];
-        ksort($params);
-        $toSign = urldecode(http_build_query($params));
-        $signature = sha1($toSign.$c['pass']);
+        return $path;
+    }
 
-        $res = Http::asMultipart()
-            ->attach('file', fopen($file->getRealPath(), 'r'), $file->getClientOriginalName())
-            ->post("https://api.cloudinary.com/v1_1/{$c['host']}/image/upload", [
-                ...$params, 'api_key' => $c['user'], 'signature' => $signature,
-            ])->throw()->json();
+    /** Copie un fichier du disque public sous un nouveau nom (chaque réservation garde ses propres photos). */
+    public static function duplicate(?string $path): ?string
+    {
+        if (! $path || ! Storage::disk('public')->exists($path)) {
+            return null;
+        }
+        $new = dirname($path).'/'.bin2hex(random_bytes(12)).'.'.pathinfo($path, PATHINFO_EXTENSION);
+        Storage::disk('public')->copy($path, $new);
 
-        return $res['secure_url'];
+        return $new;
+    }
+
+    public static function delete(?string $path): void
+    {
+        if ($path) {
+            Storage::disk('public')->delete($path);
+        }
+    }
+
+    private static function load(UploadedFile $file): ?\GdImage
+    {
+        if (! function_exists('imagewebp')) {
+            return null;
+        }
+        $data = @file_get_contents($file->getRealPath());
+        $img = $data === false ? false : @imagecreatefromstring($data);
+
+        return $img ?: null;
     }
 }

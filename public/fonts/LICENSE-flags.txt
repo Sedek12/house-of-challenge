@@ -1,0 +1,2 @@
+TwemojiCountryFlags.woff2 : police des drapeaux issue du paquet npm "country-flag-emoji-polyfill" (Twemoji, graphismes sous licence CC-BY 4.0, (c) Twitter, Inc. et contributeurs ; code sous licence MIT).
+Chargée uniquement sur les appareils qui n'affichent pas les drapeaux (par exemple Windows).

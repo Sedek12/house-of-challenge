@@ -42,50 +42,54 @@ class SlotService
     }
 
     /**
-     * Prise d'un créneau avec mise à jour conditionnelle atomique.
-     * Retourne false si le créneau vient d'être pris.
+     * Blocage d'un créneau par mise à jour conditionnelle atomique (F3).
+     * Retourne false si le créneau vient d'être pris par quelqu'un d'autre.
      */
-    public function hold(int $slotId, int $userId): bool
+    public function hold(int $slotId): bool
     {
         $now = now();
-        $affected = Slot::where('id', $slotId)
+
+        return Slot::where('id', $slotId)
             ->where(function ($q) use ($now) {
                 $q->where('status', 'DISPONIBLE')
                     ->orWhere(fn ($q2) => $q2->where('status', 'EN_ATTENTE')->where('hold_expires_at', '<', $now));
             })
-            ->update([
-                'status' => 'EN_ATTENTE',
-                'hold_expires_at' => $now->copy()->addMinutes(Settings::int('hold_minutes')),
-                'held_by_user_id' => $userId,
-            ]);
-
-        return $affected === 1;
+            ->update(['status' => 'EN_ATTENTE', 'hold_expires_at' => $now->copy()->addMinutes(Settings::int('hold_minutes'))]) === 1;
     }
 
     public function release(Slot $slot): void
     {
         if ($slot->status !== 'BLOQUE') {
-            $slot->update(['status' => 'DISPONIBLE', 'hold_expires_at' => null, 'held_by_user_id' => null]);
+            $slot->update(['status' => 'DISPONIBLE', 'hold_expires_at' => null]);
         }
     }
 
-    /** Libère les holds expirés et annule les réservations en attente de paiement associées. */
+    /** Libère les blocages expirés et annule les réservations en attente de paiement associées. */
     public function releaseExpiredHolds(): int
     {
         $count = 0;
-        Slot::where('status', 'EN_ATTENTE')->where('hold_expires_at', '<', now())->each(function (Slot $slot) use (&$count) {
-            DB::transaction(function () use ($slot, &$count) {
-                $slot = Slot::lockForUpdate()->find($slot->id);
-                if ($slot->status !== 'EN_ATTENTE' || $slot->hold_expires_at?->gte(now())) {
-                    return;
-                }
-                Booking::where('slot_id', $slot->id)->where('status', 'EN_ATTENTE_PAIEMENT')
-                    ->update(['status' => 'ANNULEE', 'cancelled_at' => now(), 'cancel_reason' => 'Délai de paiement expiré']);
-                $this->release($slot);
-                $count++;
+        Slot::where('status', 'EN_ATTENTE')->where('hold_expires_at', '<', now())->pluck('id')
+            ->each(function ($id) use (&$count) {
+                $count += $this->releaseIfExpired((int) $id) ? 1 : 0;
             });
-        });
 
         return $count;
+    }
+
+    /** Libère un créneau dont le blocage a expiré (utilisé aussi juste avant une nouvelle réservation du même créneau). */
+    public function releaseIfExpired(int $slotId): bool
+    {
+        return DB::transaction(function () use ($slotId) {
+            $slot = Slot::lockForUpdate()->find($slotId);
+            if (! $slot || $slot->status !== 'EN_ATTENTE' || $slot->hold_expires_at?->gte(now())) {
+                return false;
+            }
+            Booking::where('slot_id', $slot->id)->where('status', 'EN_ATTENTE_PAIEMENT')->each(
+                fn (Booking $b) => $b->update(['status' => 'ANNULEE', 'cancelled_at' => now(), 'cancel_reason' => 'Délai de paiement expiré'])
+            );
+            $this->release($slot);
+
+            return true;
+        });
     }
 }

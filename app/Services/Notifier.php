@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Mail\GenericMail;
 use App\Models\Booking;
-use App\Models\Publication;
-use App\Models\Purchase;
+use App\Models\User;
+use App\Support\Countries;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -18,6 +18,22 @@ class Notifier
         $c = Carbon::instance($d)->setTimezone($tz ?? config('app.display_timezone'))->locale('fr');
 
         return $c->isoFormat('dddd D MMMM YYYY [à] HH [h] mm');
+    }
+
+    public static function trackingUrl(Booking $b): string
+    {
+        return route('track', ['token' => $b->tracking_token]);
+    }
+
+    public static function whatsappUrl(?Booking $b = null): ?string
+    {
+        $wa = preg_replace('/\D/', '', (string) Settings::get('contact_whatsapp'));
+        if (! $wa) {
+            return null;
+        }
+        $text = $b ? "Bonjour, je vous contacte au sujet de ma réservation {$b->reference}." : 'Bonjour, je souhaite des informations sur OCD Live.';
+
+        return 'https://wa.me/'.$wa.'?text='.rawurlencode($text);
     }
 
     public static function modeInstructions(Booking $b): array
@@ -34,81 +50,109 @@ class Notifier
         } else {
             $lines = [
                 'Mode : à distance, via TikTok.',
-                'Soyez connecté sur TikTok avec le compte @'.($b->user->tiktok_username ?? '…').' 15 minutes avant ; vous recevrez une invitation à rejoindre le live.',
+                'Soyez connecté sur TikTok'.($b->tiktok ? ' avec le compte @'.ltrim($b->tiktok, '@') : '').' 15 minutes avant ; vous recevrez une invitation à rejoindre le live.',
+                'Le live a lieu sur le compte TikTok de House of Challenge : '.Settings::get('tiktok_show_url'),
                 'Prévoyez une bonne connexion internet et un bon éclairage.',
             ];
-        }
-        if ($wa = Settings::get('contact_whatsapp')) {
-            $lines[] = 'Contact WhatsApp : https://wa.me/'.preg_replace('/\D/', '', $wa);
         }
 
         return $lines;
     }
 
-    public static function send(?string $to, string $subject, array $lines, ?array $attachment = null): void
+    public static function send(?string $to, string $subject, array $lines, ?array $attachment = null, ?array $action = null): void
     {
         if (! $to) {
             return;
         }
         try {
-            Mail::to($to)->send(new GenericMail($subject, $lines, $attachment));
+            Mail::to($to)->send(new GenericMail($subject, $lines, $attachment, $action));
         } catch (\Throwable $e) {
             Log::error('Échec envoi e-mail : '.$e->getMessage(), ['to' => $to, 'subject' => $subject]);
         }
     }
 
-    public static function bookingConfirmed(Booking $b): void
+    /**
+     * Destinataires des alertes « nouvelle réservation » : l'adresse réglée dans Admin → Paramètres
+     * (plusieurs adresses possibles, séparées par des virgules) ou, à défaut, les administrateurs.
+     *
+     * @return array<int, string>
+     */
+    public static function teamRecipients(): array
     {
-        $b->loadMissing('user', 'slot', 'project');
-        $lines = array_merge([
-            'Bonjour '.$b->user->first_name.',',
-            'Votre passage à House of Challenge est confirmé.',
-            'Date : '.self::format($b->slot->starts_at).' (heure de Lomé)',
-            'Projet : '.$b->project->title,
-        ], self::modeInstructions($b));
-        self::send($b->user->email, 'Réservation confirmée — House of Challenge', $lines, [
+        $configured = array_filter(array_map('trim', explode(',', (string) Settings::get('notification_email'))), fn ($e) => filter_var($e, FILTER_VALIDATE_EMAIL));
+
+        return $configured ?: User::where('role', 'ADMIN')->where('is_active', true)->pluck('email')->all();
+    }
+
+    /** E-mail de bienvenue après la création d'un compte vendeur : confirmation et étapes suivantes. */
+    public static function accountCreated(User $u): void
+    {
+        $lines = [
+            'Bonjour '.$u->name.',',
+            'Votre compte vendeur OCD Live est bien créé. Bienvenue chez House of Challenge !',
+            'Voici la suite :',
+            '1. Choisissez le package qui vous convient.',
+            '2. Réservez le créneau de votre passage en direct sur TikTok.',
+            '3. Renseignez votre boutique et vos produits (ils seront mémorisés pour vos prochaines réservations).',
+            '4. Payez en ligne : vous recevez aussitôt la confirmation, le lien de suivi et l\'ajout à votre agenda.',
+            'Votre adresse de connexion : '.$u->email.' (mot de passe oublié ? '.route('password.request').')',
+        ];
+        if ($wa = self::whatsappUrl()) {
+            $lines[] = 'Une question ? WhatsApp : '.$wa;
+        }
+        self::send($u->email, 'Bienvenue sur OCD Live — votre compte est créé', $lines, null, ['label' => 'Réserver mon passage', 'url' => route('reserve')]);
+    }
+
+    /** Alerte l'équipe d'une nouvelle réservation confirmée, avec un lien vers le tableau de bord. */
+    public static function newBookingAlert(Booking $b): void
+    {
+        $b->loadMissing('slot', 'package', 'products');
+        $when = self::format($b->slot->starts_at);
+        $country = collect(Countries::all())->firstWhere('code', $b->country)['name'] ?? $b->country;
+        $lines = [
+            'Nouvelle réservation confirmée : '.$b->reference,
+            'Passage : '.$when.' (heure de Lomé) — '.($b->mode === 'SUR_PLACE' ? 'sur place, au studio' : 'à distance, sur TikTok'),
+            'Boutique : '.$b->shop_name.' — '.$b->activity_domain.' ('.$b->city.($country ? ', '.$country : '').')',
+            'Activité : '.$b->activity_description,
+            'Vendeur : '.$b->full_name.' — WhatsApp '.$b->phone.' — '.$b->email,
+            'Package : '.$b->package->name.' ('.$b->package->duration_minutes.' min) — '.number_format($b->amount, 0, ',', ' ').' FCFA — '.$b->products->count().' produit(s)',
+            'Connectez-vous au tableau de bord pour voir le planning et la fiche complète du vendeur.',
+        ];
+        $action = ['label' => 'Voir la réservation', 'url' => route('team.booking', $b)];
+        foreach (self::teamRecipients() as $to) {
+            self::send($to, 'Nouvelle réservation — '.$b->shop_name.' — '.$when, $lines, null, $action);
+        }
+    }
+
+    /** F8 : récapitulatif, numéro de réservation et lien de suivi. */
+    public static function bookingConfirmed(Booking $b, ?string $intro = null): void
+    {
+        $b->loadMissing('slot', 'package', 'products');
+        $lines = [
+            'Bonjour '.$b->full_name.',',
+            $intro ?? 'Votre réservation est confirmée, merci !',
+            'Numéro de réservation : '.$b->reference,
+            'Package : '.$b->package->name.' — '.number_format($b->amount, 0, ',', ' ').' FCFA',
+            'Passage : '.self::format($b->slot->starts_at).' (heure de Lomé), '.$b->package->duration_minutes.' min',
+            'Boutique : '.$b->shop_name.' ('.$b->products->count().' produit(s))',
+            ...self::modeInstructions($b),
+            'Suivre ma réservation et modifier mes produits jusqu\'à '.Settings::int('edit_deadline_hours').' h avant le live : '.self::trackingUrl($b),
+        ];
+        if ($wa = self::whatsappUrl($b)) {
+            $lines[] = 'Une question ? WhatsApp : '.$wa;
+        }
+        self::send($b->email, 'Réservation confirmée '.$b->reference.' — OCD Live', $lines, [
             'name' => 'passage.ics', 'mime' => 'text/calendar', 'data' => IcsBuilder::forBooking($b),
         ]);
     }
 
     public static function bookingCancelled(Booking $b, string $why): void
     {
-        $b->loadMissing('user', 'slot');
-        self::send($b->user->email, 'Réservation annulée — House of Challenge', [
-            'Bonjour '.$b->user->first_name.',',
-            'Votre réservation du '.self::format($b->slot->starts_at).' a été annulée.',
+        $b->loadMissing('slot');
+        self::send($b->email, 'Réservation annulée '.$b->reference.' — OCD Live', [
+            'Bonjour '.$b->full_name.',',
+            'Votre réservation '.$b->reference.' du '.self::format($b->slot->starts_at).' a été annulée.',
             $why,
         ]);
-    }
-
-    public static function reminder(Booking $b, string $when): void
-    {
-        $b->loadMissing('user', 'slot');
-        $lines = array_merge([
-            'Bonjour '.$b->user->first_name.',',
-            "Rappel : votre passage a lieu dans {$when}, le ".self::format($b->slot->starts_at).' (heure de Lomé).',
-        ], self::modeInstructions($b));
-        self::send($b->user->email, "Rappel : votre passage dans {$when}", $lines);
-    }
-
-    public static function paymentReceived(Purchase $p): void
-    {
-        $p->loadMissing('user');
-        self::send($p->user->email, 'Paiement reçu — House of Challenge', [
-            'Bonjour '.$p->user->first_name.',',
-            'Nous avons bien reçu votre paiement.',
-            'Commande n° '.$p->id.' — '.$p->package_name,
-            'Montant : '.number_format($p->amount, 0, ',', ' ').' FCFA',
-            $p->credits_total.' crédit(s) de passage ajouté(s) à votre compte.',
-        ]);
-    }
-
-    public static function publicationReviewed(Publication $pub, bool $accepted): void
-    {
-        $pub->loadMissing('purchase.user', 'project');
-        $u = $pub->purchase->user;
-        self::send($u->email, $accepted ? 'Votre projet est publié' : 'Publication refusée', $accepted
-            ? ['Bonjour '.$u->first_name.',', 'Votre projet « '.$pub->project?->title.' » est maintenant visible sur House of Challenge.']
-            : ['Bonjour '.$u->first_name.',', 'Votre demande de publication a été refusée.', 'Motif : '.$pub->reject_reason]);
     }
 }

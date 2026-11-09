@@ -1,64 +1,45 @@
-import { Card, Field, StatusBadge, inputCls } from '@/components/hoc';
+import { Card, Field, Pkg, inputCls } from '@/components/hoc';
+import { Button } from '@/components/ui/button';
 import SiteLayout from '@/layouts/site-layout';
-import { fcfa } from '@/lib/format';
 import { Head, useForm } from '@inertiajs/react';
-import { useState } from 'react';
 
-type Pkg = {
-    id?: number; code: string; name: string; description: string; price: number; price_on_site: number | null; price_remote: number | null;
-    credits_included: number; validity_days: number; includes_publication: boolean; publication_days: number | null;
-    allowed_modes: string[]; is_active: boolean; display_order: number;
-};
+type P = Pkg & { is_active: boolean; display_order: number };
 
-const EMPTY: Pkg = { code: '', name: '', description: '', price: 0, price_on_site: null, price_remote: null, credits_included: 1, validity_days: 90, includes_publication: false, publication_days: null, allowed_modes: ['SUR_PLACE', 'A_DISTANCE'], is_active: true, display_order: 0 };
-
-function PackageForm({ initial, onDone }: { initial: Pkg; onDone: () => void }) {
-    const { data, setData, post, processing, errors } = useForm<Pkg>(initial);
+function PackForm({ pkg }: { pkg?: P }) {
+    const { data, setData, post, processing, errors, reset, transform } = useForm({
+        code: pkg?.code ?? '', name: pkg?.name ?? '', description: pkg?.description ?? '', price: String(pkg?.price ?? ''), duration_minutes: String(pkg?.duration_minutes ?? 10),
+        max_products: String(pkg?.max_products ?? 3), includes: (pkg?.includes ?? []).join('\n'), is_active: pkg?.is_active ?? true, display_order: String(pkg?.display_order ?? 0),
+    });
+    transform((d) => ({ ...d, includes: d.includes.split('\n').map((l) => l.trim()).filter(Boolean) }));
     const err = errors as Record<string, string>;
-    const num = (k: keyof Pkg, nullable = false) => (e: React.ChangeEvent<HTMLInputElement>) => setData(k, (e.target.value === '' && nullable ? null : Number(e.target.value)) as never);
     return (
-        <form onSubmit={(e) => { e.preventDefault(); post(initial.id ? route('admin.packages.update', initial.id) : route('admin.packages.store'), { onSuccess: onDone }); }}
-            className="mt-3 grid gap-3 border-t pt-3 md:grid-cols-3">
-            <Field label="Code" error={err.code}><input className={inputCls} value={data.code} onChange={(e) => setData('code', e.target.value)} required /></Field>
-            <Field label="Nom" error={err.name}><input className={inputCls} value={data.name} onChange={(e) => setData('name', e.target.value)} required /></Field>
-            <Field label="Ordre d’affichage"><input type="number" className={inputCls} value={data.display_order} onChange={num('display_order')} /></Field>
-            <div className="md:col-span-3"><Field label="Description" error={err.description}><textarea className={inputCls} value={data.description} onChange={(e) => setData('description', e.target.value)} required /></Field></div>
-            <Field label="Prix (FCFA)" error={err.price}><input type="number" min={0} className={inputCls} value={data.price} onChange={num('price')} /></Field>
-            <Field label="Prix sur place (optionnel)"><input type="number" min={0} className={inputCls} value={data.price_on_site ?? ''} onChange={num('price_on_site', true)} /></Field>
-            <Field label="Prix à distance (optionnel)"><input type="number" min={0} className={inputCls} value={data.price_remote ?? ''} onChange={num('price_remote', true)} /></Field>
-            <Field label="Crédits inclus"><input type="number" min={0} className={inputCls} value={data.credits_included} onChange={num('credits_included')} /></Field>
-            <Field label="Validité (jours)"><input type="number" min={1} className={inputCls} value={data.validity_days} onChange={num('validity_days')} /></Field>
-            <Field label="Durée de publication (jours)"><input type="number" min={1} className={inputCls} value={data.publication_days ?? ''} onChange={num('publication_days', true)} /></Field>
-            <div className="flex flex-wrap items-center gap-4 text-sm md:col-span-3">
-                <label><input type="checkbox" checked={data.includes_publication} onChange={(e) => setData('includes_publication', e.target.checked)} /> Inclut la publication</label>
-                <label><input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} /> Active</label>
-                {['SUR_PLACE', 'A_DISTANCE'].map((m) => (
-                    <label key={m}><input type="checkbox" checked={data.allowed_modes.includes(m)} onChange={(e) => setData('allowed_modes', e.target.checked ? [...data.allowed_modes, m] : data.allowed_modes.filter((x) => x !== m))} /> {m === 'SUR_PLACE' ? 'Sur place' : 'À distance'}</label>
-                ))}
-                {err.allowed_modes && <span className="text-red-600">{err.allowed_modes}</span>}
-            </div>
-            <button disabled={processing} className="rounded-md bg-[#B05A26] px-4 py-2 text-white md:col-span-3">Enregistrer</button>
-        </form>
+        <Card>
+            <form onSubmit={(e) => { e.preventDefault(); post(pkg ? route('admin.packages.update', pkg.id) : route('admin.packages.store'), { preserveScroll: true, onSuccess: () => !pkg && reset() }); }} className="grid gap-3 md:grid-cols-3">
+                <Field label="Nom" error={err.name}><input className={inputCls} value={data.name} onChange={(e) => setData('name', e.target.value)} /></Field>
+                <Field label="Code" error={err.code}><input className={inputCls} value={data.code} onChange={(e) => setData('code', e.target.value)} /></Field>
+                <Field label="Prix (FCFA)" error={err.price}><input className={inputCls} inputMode="numeric" value={data.price} onChange={(e) => setData('price', e.target.value.replace(/\D/g, ''))} /></Field>
+                <Field label="Durée du passage (min)" error={err.duration_minutes}><input className={inputCls} inputMode="numeric" value={data.duration_minutes} onChange={(e) => setData('duration_minutes', e.target.value.replace(/\D/g, ''))} /></Field>
+                <Field label="Produits maximum (1 à 10)" error={err.max_products}><input className={inputCls} inputMode="numeric" value={data.max_products} onChange={(e) => setData('max_products', e.target.value.replace(/\D/g, ''))} /></Field>
+                <Field label="Ordre d’affichage" error={err.display_order}><input className={inputCls} inputMode="numeric" value={data.display_order} onChange={(e) => setData('display_order', e.target.value.replace(/\D/g, ''))} /></Field>
+                <Field label="Description" error={err.description}><textarea className={inputCls} rows={3} value={data.description} onChange={(e) => setData('description', e.target.value)} /></Field>
+                <Field label="Ce qui est inclus (une ligne par élément)"><textarea className={inputCls} rows={3} value={data.includes} onChange={(e) => setData('includes', e.target.value)} /></Field>
+                <div className="flex flex-col justify-between">
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={data.is_active} onChange={(e) => setData('is_active', e.target.checked)} /> Package actif (visible et réservable)</label>
+                    <Button disabled={processing}>{pkg ? 'Enregistrer' : 'Créer le package'}</Button>
+                </div>
+            </form>
+        </Card>
     );
 }
 
-export default function Packages({ packages }: { packages: (Pkg & { id: number })[] }) {
-    const [editing, setEditing] = useState<number | 'new' | null>(null);
+export default function Packages({ packages }: { packages: P[] }) {
     return (
-        <SiteLayout portal="admin" title="Formules">
-            <Head title="Formules" />
-            <button className="mb-4 rounded-md bg-[#B05A26] px-4 py-2 text-sm text-white" onClick={() => setEditing('new')}>+ Nouvelle formule</button>
-            {editing === 'new' && <Card className="mb-4"><b>Nouvelle formule</b><PackageForm initial={EMPTY} onDone={() => setEditing(null)} /></Card>}
-            <div className="grid gap-3">
-                {packages.map((p) => (
-                    <Card key={p.id}>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div><b>{p.name}</b> <span className="text-xs text-neutral-500">({p.code})</span><div className="text-sm">{fcfa(p.price)} · {p.credits_included} passage(s) · {p.validity_days} j{p.includes_publication && ' · publication'}</div></div>
-                            <div className="flex items-center gap-2"><StatusBadge status={p.is_active ? 'CONFIRMEE' : 'ANNULEE'} /><button className="text-sm underline" onClick={() => setEditing(editing === p.id ? null : p.id)}>Modifier</button></div>
-                        </div>
-                        {editing === p.id && <PackageForm initial={p} onDone={() => setEditing(null)} />}
-                    </Card>
-                ))}
+        <SiteLayout portal="admin" title="Packages">
+            <Head title="Packages" />
+            <div className="grid gap-4">
+                {packages.map((p) => <PackForm key={p.id} pkg={p} />)}
+                <h2 className="mt-4 font-bold">Nouveau package</h2>
+                <PackForm />
             </div>
         </SiteLayout>
     );

@@ -1,59 +1,65 @@
-import { Card, Field, ModeBadge, Pagination, StatusBadge, inputCls } from '@/components/hoc';
+import { Card, ModeBadge, Pagination, StatusBadge, inputCls } from '@/components/hoc';
+import { Button } from '@/components/ui/button';
 import SiteLayout from '@/layouts/site-layout';
-import { fmtLome } from '@/lib/format';
-import { Head, router, useForm } from '@inertiajs/react';
+import { fcfa, fmtLome } from '@/lib/format';
+import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 
-type B = { id: number; status: string; mode: string; user: { name: string; email: string }; project: { title: string }; slot: { starts_at: string } };
+type B = { id: number; reference: string; status: string; mode: string; full_name: string; shop_name: string; email: string; phone: string; amount: number; package: string; starts_at: string; tracking_token: string };
 
-export default function Bookings({ bookings, filters, users, projects, open_slots }: {
-    bookings: { data: B[]; links: never[] }; filters: Record<string, string>;
-    users: { id: number; name: string; email: string }[]; projects: { id: number; title: string; user_id: number }[]; open_slots: { id: number; starts_at: string }[];
-}) {
-    const [f, setF] = useState({ q: filters.q ?? '', status: filters.status ?? '', mode: filters.mode ?? '', from: filters.from ?? '' });
-    const { data, setData, post, processing, errors } = useForm({ user_id: '', project_id: '', slot_id: '', mode: 'A_DISTANCE' });
-    const err = errors as Record<string, string>;
+function Row({ b, slots }: { b: B; slots: { id: number; starts_at: string }[] }) {
+    const [target, setTarget] = useState('');
+    return (
+        <Card className="grid gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+                <b>{b.reference}</b><StatusBadge status={b.status} /><ModeBadge mode={b.mode} />
+                <span className="ml-auto">{fcfa(b.amount)} · {b.package}</span>
+            </div>
+            <div>{b.shop_name} — {b.full_name} · {b.email} · {b.phone}</div>
+            <div>{fmtLome(b.starts_at)}</div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button asChild size="sm" variant="outline"><a href={route('track', b.tracking_token)} target="_blank" rel="noreferrer">Lien de suivi</a></Button>
+                {b.status === 'CONFIRMEE' && (
+                    <>
+                        <select aria-label="Nouveau créneau" className={`${inputCls} !w-auto`} value={target} onChange={(e) => setTarget(e.target.value)}>
+                            <option value="">Déplacer vers…</option>
+                            {slots.map((s) => <option key={s.id} value={s.id}>{fmtLome(s.starts_at)}</option>)}
+                        </select>
+                        <Button size="sm" variant="outline" disabled={!target} onClick={() => router.post(route('admin.bookings.reschedule', b.id), { slot_id: target }, { preserveScroll: true })}>Déplacer</Button>
+                    </>
+                )}
+                {['CONFIRMEE', 'EN_ATTENTE_PAIEMENT'].includes(b.status) && (
+                    <Button size="sm" variant="destructive" onClick={() => confirm('Annuler cette réservation ? Le créneau sera libéré. Le remboursement se fait hors du site.') && router.post(route('admin.bookings.cancel', b.id), {}, { preserveScroll: true })}>Annuler</Button>
+                )}
+                {b.status === 'CONFIRMEE' && <>
+                    <Button size="sm" onClick={() => router.post(route('admin.bookings.mark', b.id), { status: 'EFFECTUEE' }, { preserveScroll: true })}>Effectué</Button>
+                    <Button size="sm" variant="outline" onClick={() => router.post(route('admin.bookings.mark', b.id), { status: 'ABSENT' }, { preserveScroll: true })}>Absent</Button>
+                </>}
+            </div>
+        </Card>
+    );
+}
+
+export default function Bookings({ bookings, filters, open_slots }: { bookings: { data: B[]; links: never[] }; filters: Record<string, string>; open_slots: { id: number; starts_at: string }[] }) {
+    const [f, setF] = useState({ q: filters.q ?? '', status: filters.status ?? '', from: filters.from ?? '' });
     return (
         <SiteLayout portal="admin" title="Réservations">
             <Head title="Réservations" />
-            <form onSubmit={(e) => { e.preventDefault(); router.get(route('admin.bookings'), Object.fromEntries(Object.entries(f).filter(([, v]) => v))); }} className="mb-4 grid gap-2 md:grid-cols-5">
-                <input aria-label="Recherche" placeholder="Nom ou e-mail" className={inputCls} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
+            <form onSubmit={(e) => { e.preventDefault(); router.get(route('admin.bookings'), Object.fromEntries(Object.entries(f).filter(([, v]) => v))); }} className="mb-4 grid gap-2 md:grid-cols-4">
+                <input aria-label="Recherche" placeholder="Nom, boutique, e-mail, référence" className={inputCls} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
                 <select aria-label="Statut" className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
                     <option value="">Tous statuts</option>
-                    {['EN_ATTENTE_PAIEMENT', 'CONFIRMEE', 'EFFECTUEE', 'ABSENT', 'ANNULEE', 'ANNULEE_PAR_ORGANISATEUR'].map((s) => <option key={s}>{s}</option>)}
+                    {['EN_ATTENTE_PAIEMENT', 'CONFIRMEE', 'EFFECTUEE', 'ABSENT', 'ANNULEE'].map((s) => <option key={s}>{s}</option>)}
                 </select>
-                <select aria-label="Mode" className={inputCls} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="">Tous modes</option><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select>
                 <input aria-label="À partir du" type="date" className={inputCls} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} />
-                <button className="rounded-md bg-[#B05A26] px-3 text-white">Filtrer</button>
+                <Button>Filtrer</Button>
             </form>
-
-            <div className="overflow-x-auto rounded-lg border bg-white">
-                <table className="w-full text-left text-sm">
-                    <thead className="bg-neutral-100"><tr><th className="p-2">#</th><th className="p-2">Participant</th><th className="p-2">Projet</th><th className="p-2">Créneau</th><th className="p-2">Mode</th><th className="p-2">Statut</th><th className="p-2" /></tr></thead>
-                    <tbody>
-                        {bookings.data.map((b) => (
-                            <tr key={b.id} className="border-t">
-                                <td className="p-2">{b.id}</td><td className="p-2">{b.user.name}<div className="text-xs text-neutral-500">{b.user.email}</div></td>
-                                <td className="p-2">{b.project.title}</td><td className="p-2">{fmtLome(b.slot.starts_at)}</td>
-                                <td className="p-2"><ModeBadge mode={b.mode} /></td><td className="p-2"><StatusBadge status={b.status} /></td>
-                                <td className="p-2">{['CONFIRMEE', 'EN_ATTENTE_PAIEMENT'].includes(b.status) && <button className="text-xs text-red-600 underline" onClick={() => confirm('Annuler et recréditer ?') && router.post(route('admin.bookings.cancel', b.id))}>Annuler</button>}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div className="mb-3"><Button asChild variant="outline" size="sm"><a href={route('admin.export', 'reservations')}>Exporter en CSV</a></Button></div>
+            <div className="grid gap-3">
+                {bookings.data.length === 0 && <Card>Aucune réservation.</Card>}
+                {bookings.data.map((b) => <Row key={b.id} b={b} slots={open_slots} />)}
             </div>
             <Pagination links={bookings.links} />
-
-            <Card className="mt-8">
-                <b>Créer une réservation manuellement</b> <span className="text-xs text-neutral-500">(ex. paiement en espèces : enregistrez d’abord le paiement)</span>
-                <form onSubmit={(e) => { e.preventDefault(); post(route('admin.bookings.store')); }} className="mt-3 grid gap-3 md:grid-cols-5">
-                    <Field label="Participant" error={err.user_id}><select className={inputCls} value={data.user_id} onChange={(e) => setData({ ...data, user_id: e.target.value, project_id: '' })} required><option value="" />{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
-                    <Field label="Projet" error={err.project_id}><select className={inputCls} value={data.project_id} onChange={(e) => setData('project_id', e.target.value)} required><option value="" />{projects.filter((p) => String(p.user_id) === data.user_id).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}</select></Field>
-                    <Field label="Créneau" error={err.slot_id}><select className={inputCls} value={data.slot_id} onChange={(e) => setData('slot_id', e.target.value)} required><option value="" />{open_slots.map((s) => <option key={s.id} value={s.id}>{fmtLome(s.starts_at)}</option>)}</select></Field>
-                    <Field label="Mode"><select className={inputCls} value={data.mode} onChange={(e) => setData('mode', e.target.value)}><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select></Field>
-                    <button disabled={processing} className="self-end rounded-md bg-[#B05A26] px-3 py-2 text-white">Créer</button>
-                </form>
-            </Card>
         </SiteLayout>
     );
 }

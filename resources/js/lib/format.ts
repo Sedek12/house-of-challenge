@@ -1,6 +1,6 @@
 const LOME = 'Africa/Lome';
 
-export const fcfa = (n: number | string) => `${new Intl.NumberFormat('fr-FR').format(Number(n)).replace(/ | /g, ' ')} FCFA`;
+export const fcfa = (n: number | string) => `${new Intl.NumberFormat('fr-FR').format(Number(n)).replace(/[\u202f\u00a0]/g, ' ')} FCFA`;
 
 const full = (tz: string): Intl.DateTimeFormatOptions => ({
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: tz,
@@ -28,6 +28,9 @@ export function localHint(iso: string) {
     const b = new Date(iso).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit', day: 'numeric', timeZone: LOME });
     return a === b ? null : `${fmtTime(iso, tz)} chez vous (${tz})`;
 }
+
+/** « https://www.tiktok.com/@houseofchallenge » → « @houseofchallenge » (chaîne vide si l'adresse n'a pas ce format). */
+export const tiktokHandle = (url?: string | null) => /tiktok\.com\/(@[^/?#]+)/i.exec(url ?? '')?.[1] ?? '';
 
 export const MODE_LABEL: Record<string, string> = { SUR_PLACE: 'Sur place (Togo)', A_DISTANCE: 'À distance (TikTok)' };
 

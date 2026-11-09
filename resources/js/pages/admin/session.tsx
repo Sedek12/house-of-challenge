@@ -13,9 +13,9 @@ export default function Session({ session, slots }: { session: { id: number; tit
             <div className="mb-4 flex flex-wrap items-center gap-3">
                 <span>{fmtLome(session.starts_at)}</span><StatusBadge status={session.status} />
                 {session.status === 'PROGRAMMEE' && (
-                    <Button variant="destructive" size="sm" onClick={() => confirm('Annuler la session ? Toutes les réservations seront annulées et les crédits rendus.') && router.post(route('admin.sessions.cancel', session.id))}>Annuler la session</Button>
+                    <Button variant="destructive" size="sm" onClick={() => confirm('Annuler ce live ? Toutes les réservations seront annulées et les vendeurs prévenus par e-mail (remboursement hors du site).') && router.post(route('admin.sessions.cancel', session.id))}>Annuler le live</Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => confirm('Supprimer la session ?') && router.delete(route('admin.sessions.delete', session.id))}>Supprimer</Button>
+                <Button variant="outline" size="sm" onClick={() => confirm('Supprimer ce live ?') && router.delete(route('admin.sessions.delete', session.id))}>Supprimer</Button>
             </div>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {slots.map((s) => (

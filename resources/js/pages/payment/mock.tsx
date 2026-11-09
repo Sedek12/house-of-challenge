@@ -10,7 +10,7 @@ export default function Mock({ reference, amount, name }: { reference: string; a
         <SiteLayout title="Paiement simulé (développement)">
             <Head title="Paiement simulé" />
             <Card className="max-w-md">
-                <p>Formule : <b>{name}</b></p>
+                <p>Package : <b>{name}</b></p>
                 <p>Montant : <b>{fcfa(amount)}</b></p>
                 <div className="mt-4 flex gap-2">
                     <Button onClick={() => send('PAID')}>Simuler succès</Button>

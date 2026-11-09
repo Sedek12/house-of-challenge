@@ -35,10 +35,9 @@ return [
         ],
     ],
 
-    'upload' => [
-        'provider' => env('UPLOAD_PROVIDER', 'local'),
-        'cloudinary_url' => env('CLOUDINARY_URL'),
-    ],
+    // Certificats d'autorité pour les appels HTTPS sortants (agrégateurs de paiement). Utile sous Windows/WAMP, où PHP n'en a pas :
+    // placer cacert.pem dans storage/certs/ (https://curl.se/ca/cacert.pem) ou indiquer son chemin ici. Jamais de vérification désactivée.
+    'http' => ['ca_bundle' => env('HTTP_CA_BUNDLE')],
 
     'cron_secret' => env('CRON_SECRET'),
 

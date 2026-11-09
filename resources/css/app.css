@@ -82,19 +82,19 @@
     --card-foreground: hsl(0, 0%, 3.9%);
     --popover: hsl(0, 0%, 100%);
     --popover-foreground: hsl(0, 0%, 3.9%);
-    --primary: hsl(22, 65%, 42%);
-    --primary-foreground: hsl(0, 0%, 100%);
+    --primary: #ee6400;
+    --primary-foreground: #ffffff;
     --secondary: hsl(0, 0%, 96.1%);
     --secondary-foreground: hsl(0, 0%, 9%);
     --muted: hsl(0, 0%, 96.1%);
     --muted-foreground: hsl(0, 0%, 45.1%);
-    --accent: hsl(0, 0%, 96.1%);
-    --accent-foreground: hsl(0, 0%, 9%);
+    --accent: #fff1e6; /* orange très clair : survol des boutons secondaires */
+    --accent-foreground: #b85600;
     --destructive: hsl(0, 84.2%, 60.2%);
     --destructive-foreground: hsl(0, 0%, 98%);
     --border: hsl(0, 0%, 92.8%);
     --input: hsl(0, 0%, 89.8%);
-    --ring: hsl(0, 0%, 3.9%);
+    --ring: #ee6400;
     --chart-1: hsl(12, 76%, 61%);
     --chart-2: hsl(173, 58%, 39%);
     --chart-3: hsl(197, 37%, 24%);
@@ -118,8 +118,8 @@
     --card-foreground: hsl(0, 0%, 98%);
     --popover: hsl(0, 0%, 3.9%);
     --popover-foreground: hsl(0, 0%, 98%);
-    --primary: hsl(22, 65%, 42%);
-    --primary-foreground: hsl(0, 0%, 100%);
+    --primary: #ee6400;
+    --primary-foreground: #ffffff;
     --secondary: hsl(0, 0%, 14.9%);
     --secondary-foreground: hsl(0, 0%, 98%);
     --muted: hsl(0, 0%, 6.9%);
@@ -154,4 +154,22 @@
     body {
         @apply bg-background text-foreground;
     }
+}
+
+/* Drapeaux : Windows n'affiche pas les émojis de drapeaux (il montre les lettres du pays). Sur ces appareils uniquement,
+   on charge une petite police de drapeaux (voir public/fonts/LICENSE-flags.txt). Détection dans resources/js/app.tsx. */
+@font-face {
+    font-family: 'Twemoji Country Flags';
+    unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E007F, U+E007F, U+200D, U+1F1FF;
+    src: url('/fonts/TwemojiCountryFlags.woff2') format('woff2');
+    font-display: swap;
+}
+
+.needs-flag-font .flag-font {
+    font-family: 'Twemoji Country Flags', system-ui, sans-serif;
+}
+
+/* Le site est conçu en thème clair uniquement : on empêche le mode sombre du navigateur (ou une extension) de détourner les couleurs. */
+html {
+    color-scheme: light;
 }

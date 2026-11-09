@@ -30,7 +30,7 @@ class MockPaymentProvider implements PaymentProvider
     {
         $body = $request->getContent();
         $sig = (string) $request->header('X-Signature');
-        if (! hash_equals(self::sign($body), $sig)) {
+        if ((string) config('services.payment.webhook_secret') === '' || ! hash_equals(self::sign($body), $sig)) {
             return ['valid' => false];
         }
         $d = json_decode($body, true) ?: [];

@@ -14,11 +14,6 @@ class Payment extends Model
         return ['raw_payload' => 'array'];
     }
 
-    public function purchase(): BelongsTo
-    {
-        return $this->belongsTo(Purchase::class);
-    }
-
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);

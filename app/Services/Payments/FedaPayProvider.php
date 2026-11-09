@@ -53,6 +53,9 @@ class FedaPayProvider implements PaymentProvider
         $t = $parts['t'] ?? null;
         $s = $parts['s'] ?? null;
         $secret = (string) config('services.payment.webhook_secret');
+        if ($secret === '') {
+            return ['valid' => false]; // secret non configuré : on ne fait confiance à aucune notification (la vérification serveur à serveur prend le relais)
+        }
         if (! $t || ! $s || ! hash_equals(hash_hmac('sha256', "{$t}.{$body}", $secret), $s) || abs(time() - (int) $t) > 600) {
             return ['valid' => false];
         }

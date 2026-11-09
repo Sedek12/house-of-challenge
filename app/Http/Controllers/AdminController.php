@@ -3,54 +3,45 @@
 namespace App\Http\Controllers;
 
 use App\Exceptions\BusinessException;
-use App\Models\AuditLog;
 use App\Models\Booking;
 use App\Models\LiveSession;
 use App\Models\Package;
 use App\Models\Payment;
-use App\Models\Project;
-use App\Models\Publication;
-use App\Models\Purchase;
 use App\Models\Slot;
-use App\Models\User;
 use App\Services\Audit;
 use App\Services\BookingService;
-use App\Services\CreditService;
-use App\Services\Notifier;
-use App\Services\PurchaseService;
+use App\Services\PaymentService;
+use App\Services\Planning;
 use App\Services\Settings;
 use App\Services\SlotService;
+use App\Services\UploadService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
+/** Tableau de bord OCD (administrateur) : planning, réservations, créneaux, packages, paiements, paramètres. */
 class AdminController extends Controller
 {
-    public function __construct(
-        private BookingService $bookings,
-        private CreditService $credits,
-        private PurchaseService $purchases,
-        private SlotService $slots,
-    ) {}
+    public function __construct(private BookingService $bookings, private PaymentService $payments, private SlotService $slots) {}
 
-    public function dashboard()
+    /* ---------- Planning (A4) ---------- */
+
+    public function planning(Request $request)
     {
-        $done = Booking::where('status', 'EFFECTUEE')->count();
-        $absent = Booking::where('status', 'ABSENT')->count();
+        $monthStart = now(config('app.display_timezone'))->startOfMonth()->utc();
 
-        return Inertia::render('admin/dashboard', ['stats' => [
-            'revenue_month' => (int) Purchase::where('status', 'PAYE')->where('paid_at', '>=', now()->startOfMonth())->sum('amount'),
-            'participants' => User::where('role', 'PARTICIPANT')->count(),
-            'upcoming_bookings' => Booking::where('status', 'CONFIRMEE')->whereHas('slot', fn ($q) => $q->where('starts_at', '>', now()))->count(),
-            'done' => $done,
-            'absence_rate' => ($done + $absent) ? round($absent * 100 / ($done + $absent), 1) : 0,
-            'pending_publications' => Publication::where('status', 'EN_ATTENTE')->whereNotNull('project_id')->count(),
-        ], 'sessions' => LiveSession::where('status', 'PROGRAMMEE')->where('starts_at', '>', now())->orderBy('starts_at')->limit(5)->get()]);
+        return Inertia::render('admin/planning', Planning::props($request) + ['stats' => [
+            'upcoming' => Booking::where('status', 'CONFIRMEE')->whereHas('slot', fn ($q) => $q->where('starts_at', '>=', now()))->count(),
+            'pending' => Booking::where('status', 'EN_ATTENTE_PAIEMENT')->count(),
+            'revenue_month' => (int) Payment::where('status', 'PAYE')->where('created_at', '>=', $monthStart)->sum('amount'),
+            'done' => Booking::where('status', 'EFFECTUEE')->count(),
+        ]]);
     }
 
-    /* ---------- Formules ---------- */
+    /* ---------- Packages (A2) ---------- */
 
     public function packages()
     {
@@ -62,19 +53,19 @@ class AdminController extends Controller
         $d = $request->validate([
             'code' => 'required|alpha_dash|max:50|unique:packages,code'.($package ? ','.$package->id : ''),
             'name' => 'required|max:120', 'description' => 'required|max:1000',
-            'price' => 'required|integer|min:0', 'price_on_site' => 'nullable|integer|min:0', 'price_remote' => 'nullable|integer|min:0',
-            'credits_included' => 'required|integer|min:0', 'validity_days' => 'required|integer|min:1',
-            'includes_publication' => 'boolean', 'publication_days' => 'nullable|integer|min:1',
-            'allowed_modes' => 'required|array|min:1', 'allowed_modes.*' => 'in:SUR_PLACE,A_DISTANCE',
+            'price' => 'required|integer|min:0', 'duration_minutes' => 'required|integer|min:1|max:240',
+            'max_products' => 'required|integer|min:1|max:10',
+            'includes' => 'nullable|array', 'includes.*' => 'nullable|string|max:200',
             'is_active' => 'boolean', 'display_order' => 'integer',
         ]);
+        $d['includes'] = array_values(array_filter($d['includes'] ?? []));
         $package = $package ? tap($package)->update($d) : Package::create($d);
         Audit::log($package->wasRecentlyCreated ? 'PACKAGE_CREATE' : 'PACKAGE_UPDATE', 'Package', $package->id);
 
-        return back()->with('success', 'Formule enregistrée.');
+        return back()->with('success', 'Package enregistré.');
     }
 
-    /* ---------- Sessions ---------- */
+    /* ---------- Créneaux (A3) ---------- */
 
     public function sessions()
     {
@@ -83,41 +74,57 @@ class AdminController extends Controller
         ]);
     }
 
-    public function createSession(Request $request)
+    private function makeSession(string $date, string $start, string $end, array $d): LiveSession
     {
         $tz = config('app.display_timezone');
+        $session = LiveSession::create([
+            'title' => $d['title'], 'accepted_modes' => $d['accepted_modes'], 'slot_minutes' => $d['slot_minutes'], 'break_minutes' => $d['break_minutes'],
+            'starts_at' => Carbon::createFromFormat('Y-m-d H:i', "$date $start", $tz)->utc(),
+            'ends_at' => Carbon::createFromFormat('Y-m-d H:i', "$date $end", $tz)->utc(),
+        ]);
+        $this->slots->generate($session);
+
+        return $session;
+    }
+
+    /** Ouvre les créneaux d'un live, à une date précise ou selon un modèle hebdomadaire. */
+    public function createSession(Request $request)
+    {
         $d = $request->validate([
-            'title' => 'required|max:150', 'date' => 'required|date_format:Y-m-d',
+            'title' => 'required|max:150', 'repeat' => 'required|in:once,weekly',
+            'date' => 'required|date_format:Y-m-d',
             'start_time' => 'required|date_format:H:i', 'end_time' => 'required|date_format:H:i|after:start_time',
             'accepted_modes' => 'required|array|min:1', 'accepted_modes.*' => 'in:SUR_PLACE,A_DISTANCE',
             'slot_minutes' => 'required|integer|min:5|max:120', 'break_minutes' => 'required|integer|min:0|max:60',
-            'tiktok_live_url' => 'nullable|url', 'notes' => 'nullable|max:2000',
+            'weekdays' => 'required_if:repeat,weekly|array', 'weekdays.*' => 'integer|between:1,7',
+            'weeks' => 'required_if:repeat,weekly|nullable|integer|between:1,8',
         ]);
-        // Saisie en heure de Lomé → stockage UTC.
-        $start = Carbon::createFromFormat('Y-m-d H:i', "{$d['date']} {$d['start_time']}", $tz)->utc();
-        $end = Carbon::createFromFormat('Y-m-d H:i', "{$d['date']} {$d['end_time']}", $tz)->utc();
 
-        $session = DB::transaction(function () use ($d, $start, $end) {
-            $s = LiveSession::create([
-                'title' => $d['title'], 'starts_at' => $start, 'ends_at' => $end, 'accepted_modes' => $d['accepted_modes'],
-                'slot_minutes' => $d['slot_minutes'], 'break_minutes' => $d['break_minutes'],
-                'tiktok_live_url' => $d['tiktok_live_url'] ?? null, 'notes' => $d['notes'] ?? null,
-            ]);
-            $this->slots->generate($s);
+        $dates = collect([$d['date']]);
+        if ($d['repeat'] === 'weekly') {
+            $first = Carbon::createFromFormat('Y-m-d', $d['date']);
+            $dates = collect(range(0, ((int) $d['weeks']) * 7 - 1))->map(fn ($i) => $first->copy()->addDays($i))
+                ->filter(fn (Carbon $c) => in_array($c->dayOfWeekIso, array_map('intval', $d['weekdays']), true))
+                ->map(fn (Carbon $c) => $c->format('Y-m-d'))->values();
+        }
+        if ($dates->isEmpty()) {
+            throw new BusinessException('Aucune date ne correspond aux jours choisis.');
+        }
 
-            return $s;
-        });
-        Audit::log('SESSION_CREATE', 'LiveSession', $session->id);
+        $created = DB::transaction(fn () => $dates->map(fn ($day) => $this->makeSession($day, $d['start_time'], $d['end_time'], $d)));
+        Audit::log('SESSION_CREATE', 'LiveSession', $created->first()->id, ['count' => $created->count()]);
 
-        return redirect()->route('admin.sessions.show', $session)->with('success', 'Session créée et créneaux générés.');
+        return $created->count() === 1
+            ? redirect()->route('admin.sessions.show', $created->first())->with('success', 'Créneaux ouverts.')
+            : redirect()->route('admin.sessions')->with('success', $created->count().' lives créés avec leurs créneaux.');
     }
 
     public function session(LiveSession $session)
     {
-        $slots = $session->slots()->with(['bookings' => fn ($q) => $q->whereIn('status', Booking::ACTIVE)->with('user:id,name')])->get()
+        $slots = $session->slots()->with(['bookings' => fn ($q) => $q->whereIn('status', Booking::HOLDING)])->get()
             ->map(fn (Slot $s) => [
                 'id' => $s->id, 'starts_at' => $s->starts_at->toIso8601String(), 'status' => $s->status,
-                'booking_id' => $s->bookings->first()?->id, 'who' => $s->bookings->first()?->user->name,
+                'booking_id' => $s->bookings->first()?->id, 'who' => $s->bookings->first()?->shop_name,
             ]);
 
         return Inertia::render('admin/session', ['session' => $session, 'slots' => $slots]);
@@ -142,13 +149,13 @@ class AdminController extends Controller
         $n = $this->bookings->cancelSession($session);
         Audit::log('SESSION_CANCEL', 'LiveSession', $session->id, ['bookings' => $n]);
 
-        return back()->with('success', "Session annulée ({$n} réservation(s) annulée(s), crédits rendus).");
+        return back()->with('success', "Live annulé ({$n} réservation(s) annulée(s), les vendeurs sont prévenus par e-mail).");
     }
 
     public function deleteSession(LiveSession $session)
     {
         if (Booking::whereHas('slot', fn ($q) => $q->where('live_session_id', $session->id))->exists()) {
-            throw new BusinessException('Cette session a des réservations : annulez-la plutôt que de la supprimer.');
+            throw new BusinessException('Ce live a des réservations : annulez-le plutôt que de le supprimer.');
         }
         $session->delete();
         Audit::log('SESSION_DELETE', 'LiveSession', $session->id);
@@ -156,166 +163,78 @@ class AdminController extends Controller
         return redirect()->route('admin.sessions');
     }
 
-    /* ---------- Réservations ---------- */
+    /* ---------- Réservations (A5, A9) ---------- */
 
     public function bookingsList(Request $request)
     {
-        $q = Booking::with('user:id,name,email', 'slot', 'project:id,title');
+        $q = Booking::with('slot', 'package:id,name');
         if ($s = $request->query('status')) {
             $q->where('status', $s);
-        }
-        if ($m = $request->query('mode')) {
-            $q->where('mode', $m);
         }
         if ($from = $request->query('from')) {
             $q->whereHas('slot', fn ($w) => $w->where('starts_at', '>=', $from));
         }
         if ($k = $request->query('q')) {
-            $q->whereHas('user', fn ($w) => $w->where('name', 'like', "%{$k}%")->orWhere('email', 'like', "%{$k}%"));
+            $q->where(fn ($w) => $w->where('full_name', 'like', "%{$k}%")->orWhere('shop_name', 'like', "%{$k}%")
+                ->orWhere('email', 'like', "%{$k}%")->orWhere('reference', 'like', "%{$k}%"));
         }
 
         return Inertia::render('admin/bookings', [
-            'bookings' => $q->latest('id')->paginate(25)->withQueryString(),
-            'filters' => $request->only('status', 'mode', 'from', 'q'),
-            'users' => User::where('role', 'PARTICIPANT')->orderBy('name')->get(['id', 'name', 'email']),
-            'projects' => Project::get(['id', 'title', 'user_id']),
-            'open_slots' => Slot::where('status', 'DISPONIBLE')->where('starts_at', '>', now())->orderBy('starts_at')->limit(200)->get(['id', 'starts_at']),
+            'bookings' => $q->latest('id')->paginate(25)->withQueryString()->through(fn (Booking $b) => [
+                ...$b->only('id', 'reference', 'status', 'mode', 'full_name', 'shop_name', 'email', 'phone', 'amount'),
+                'package' => $b->package->name, 'starts_at' => $b->slot->starts_at->toIso8601String(), 'tracking_token' => $b->tracking_token,
+            ]),
+            'filters' => $request->only('status', 'from', 'q'),
+            'open_slots' => Slot::where('status', 'DISPONIBLE')->where('starts_at', '>', now())->orderBy('starts_at')->limit(300)->get(['id', 'starts_at']),
         ]);
-    }
-
-    public function createBooking(Request $request)
-    {
-        $d = $request->validate([
-            'user_id' => 'required|exists:users,id', 'project_id' => 'required|exists:projects,id',
-            'slot_id' => 'required|exists:slots,id', 'mode' => 'required|in:SUR_PLACE,A_DISTANCE',
-        ]);
-        $user = User::findOrFail($d['user_id']);
-        $project = Project::where('user_id', $user->id)->findOrFail($d['project_id']);
-        $booking = $this->bookings->start($user, $project, $d['slot_id'], $d['mode']);
-        if ($booking->status !== 'CONFIRMEE') {
-            // Création manuelle sans crédit (paiement hors ligne) : confirmée directement par l'admin.
-            $this->bookings->confirm($booking);
-        }
-        Audit::log('BOOKING_CREATE_MANUAL', 'Booking', $booking->id);
-
-        return back()->with('success', 'Réservation créée.');
     }
 
     public function cancelBooking(Booking $booking)
     {
-        $this->bookings->cancel($booking->load('slot'), true, 'Annulée par l\'organisation');
+        $this->bookings->cancel($booking->load('slot'), 'Annulée par l\'organisation');
         Audit::log('BOOKING_CANCEL', 'Booking', $booking->id);
 
-        return back()->with('success', 'Réservation annulée, crédit rendu.');
+        return back()->with('success', 'Réservation annulée, créneau libéré. Le remboursement se fait hors du site.');
     }
 
     public function rescheduleBooking(Request $request, Booking $booking)
     {
         $d = $request->validate(['slot_id' => 'required|exists:slots,id']);
-        $this->bookings->reschedule($booking->load('slot', 'user'), $d['slot_id']);
+        $this->bookings->reschedule($booking->load('slot'), $d['slot_id']);
         Audit::log('BOOKING_RESCHEDULE', 'Booking', $booking->id);
 
-        return back()->with('success', 'Réservation reportée.');
+        return back()->with('success', 'Réservation déplacée, le vendeur est prévenu par e-mail.');
     }
 
-    /* ---------- Paiements ---------- */
+    public function markBooking(Request $request, Booking $booking)
+    {
+        $d = $request->validate(['status' => 'required|in:EFFECTUEE,ABSENT']);
+        $this->bookings->mark($booking, $d['status']);
+        Audit::log('BOOKING_MARK', 'Booking', $booking->id, ['status' => $d['status']]);
+
+        return back()->with('success', 'Statut mis à jour.');
+    }
+
+    /* ---------- Paiements (A7) ---------- */
 
     public function payments()
     {
         return Inertia::render('admin/payments', [
-            'payments' => Payment::with('purchase.user:id,name,email')->latest('id')->paginate(25),
-            'packages' => Package::orderBy('display_order')->get(['id', 'name', 'price']),
-            'users' => User::where('role', 'PARTICIPANT')->orderBy('name')->get(['id', 'name', 'email']),
+            'payments' => Payment::with('booking:id,reference,shop_name,full_name')->latest('id')->paginate(25),
+            'pending' => Booking::where('status', 'EN_ATTENTE_PAIEMENT')->orderByDesc('id')->get(['id', 'reference', 'shop_name', 'amount']),
         ]);
     }
 
+    /** Paiement hors ligne (espèces / transfert) : confirme la réservation en attente. */
     public function manualPayment(Request $request)
     {
-        $d = $request->validate([
-            'user_id' => 'required|exists:users,id', 'package_id' => 'required|exists:packages,id',
-            'method' => 'required|in:ESPECES,TRANSFERT', 'mode' => 'nullable|in:SUR_PLACE,A_DISTANCE',
-        ]);
-        $this->purchases->recordManual($request->user(), User::findOrFail($d['user_id']), Package::findOrFail($d['package_id']), $d['method'], $d['mode'] ?? null);
+        $d = $request->validate(['booking_id' => 'required|exists:bookings,id', 'method' => 'required|in:ESPECES,TRANSFERT']);
+        $this->payments->recordManual($request->user(), Booking::findOrFail($d['booking_id']), $d['method']);
 
-        return back()->with('success', 'Paiement manuel enregistré, crédits ajoutés.');
+        return back()->with('success', 'Paiement enregistré, réservation confirmée.');
     }
 
-    /* ---------- Utilisateurs ---------- */
-
-    public function users(Request $request)
-    {
-        $q = User::query();
-        if ($k = $request->query('q')) {
-            $q->where(fn ($w) => $w->where('name', 'like', "%{$k}%")->orWhere('email', 'like', "%{$k}%"));
-        }
-        if ($r = $request->query('role')) {
-            $q->where('role', $r);
-        }
-
-        return Inertia::render('admin/users', [
-            'users' => $q->latest('id')->paginate(25)->withQueryString()
-                ->through(fn (User $u) => [...$u->only('id', 'name', 'email', 'role', 'is_active', 'phone_e164', 'country'), 'credits' => $this->credits->available($u)]),
-            'filters' => $request->only('q', 'role'),
-        ]);
-    }
-
-    public function updateUser(Request $request, User $user)
-    {
-        $d = $request->validate(['role' => 'sometimes|in:'.implode(',', User::ROLES), 'is_active' => 'sometimes|boolean']);
-        if ($user->id === $request->user()->id) {
-            throw new BusinessException('Vous ne pouvez pas modifier votre propre rôle ou statut.');
-        }
-        $user->forceFill($d)->save();
-        Audit::log('USER_UPDATE', 'User', $user->id, $d);
-
-        return back()->with('success', 'Utilisateur mis à jour.');
-    }
-
-    public function adjustCredits(Request $request, User $user)
-    {
-        $d = $request->validate(['delta' => 'required|integer|not_in:0|between:-50,50', 'note' => 'required|max:200']);
-        $this->credits->adjust($user, $d['delta'], $d['note']);
-        Audit::log('CREDIT_ADJUST', 'User', $user->id, $d);
-
-        return back()->with('success', 'Crédits ajustés.');
-    }
-
-    /* ---------- Publications ---------- */
-
-    public function publications()
-    {
-        return Inertia::render('admin/publications', [
-            'publications' => Publication::with('project:id,title,slug,short_pitch', 'purchase.user:id,name,email,email_verified_at')->latest('id')->paginate(25),
-        ]);
-    }
-
-    public function reviewPublication(Request $request, Publication $publication)
-    {
-        $d = $request->validate(['action' => 'required|in:publish,reject,unpublish', 'reason' => 'required_if:action,reject|nullable|max:300']);
-        if ($d['action'] === 'publish') {
-            if (! $publication->project_id) {
-                throw new BusinessException('Le participant n\'a pas encore choisi de projet.');
-            }
-            if (! $publication->purchase->user->hasVerifiedEmail()) {
-                throw new BusinessException('L\'e-mail du participant n\'est pas vérifié.');
-            }
-            $publication->update([
-                'status' => 'PUBLIEE', 'published_at' => now(), 'reviewed_by_id' => $request->user()->id, 'reject_reason' => null,
-                'expires_at' => now()->addDays($publication->purchase->publication_days ?? 30),
-            ]);
-            Notifier::publicationReviewed($publication, true);
-        } elseif ($d['action'] === 'reject') {
-            $publication->update(['status' => 'REFUSEE', 'reject_reason' => $d['reason'], 'reviewed_by_id' => $request->user()->id]);
-            Notifier::publicationReviewed($publication, false);
-        } else {
-            $publication->update(['status' => 'DEPUBLIEE']);
-        }
-        Audit::log('PUBLICATION_'.strtoupper($d['action']), 'Publication', $publication->id);
-
-        return back()->with('success', 'Publication mise à jour.');
-    }
-
-    /* ---------- Paramètres, audit, exports ---------- */
+    /* ---------- Paramètres (A10) et exports (A8) ---------- */
 
     public function settings()
     {
@@ -326,6 +245,13 @@ class AdminController extends Controller
     {
         $d = $request->validate(['settings' => 'required|array']);
         foreach ($d['settings'] as $k => $v) {
+            if ($k === 'brand_color' && ! preg_match('/^#[0-9a-fA-F]{6}$/', (string) $v)) {
+                throw new BusinessException('Couleur invalide : utilisez le format #RRGGBB.');
+            }
+            // Le logo et l'image d'accueil passent uniquement par l'envoi de fichier.
+            if (in_array($k, ['brand_logo_url', 'hero_image_url'], true)) {
+                continue;
+            }
             if (array_key_exists($k, Settings::DEFAULTS)) {
                 Settings::set($k, (string) $v);
             }
@@ -335,20 +261,26 @@ class AdminController extends Controller
         return back()->with('success', 'Paramètres enregistrés.');
     }
 
-    public function audit()
+    /** Logo et image d'accueil (A10) : envoyés, redimensionnés en WebP, puis enregistrés dans les paramètres. */
+    public function uploadImage(Request $request, string $kind)
     {
-        return Inertia::render('admin/audit', ['logs' => AuditLog::latest('id')->paginate(40)]);
+        abort_unless(in_array($kind, ['logo', 'hero'], true), 404);
+        $request->validate(['image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120']);
+        $path = UploadService::storeImage($request->file('image'), 'site', $kind === 'logo' ? 600 : 1400, 85);
+        Settings::set($kind === 'logo' ? 'brand_logo_url' : 'hero_image_url', Storage::disk('public')->url($path));
+        Audit::log('SETTINGS_IMAGE', 'Setting', $kind);
+
+        return back()->with('success', 'Image enregistrée.');
     }
 
     public function export(string $type)
     {
+        $tz = config('app.display_timezone');
         $rows = match ($type) {
-            'reservations' => [['ID', 'Participant', 'E-mail', 'Projet', 'Mode', 'Statut', 'Début (UTC)'],
-                Booking::with('user', 'project', 'slot')->get()->map(fn ($b) => [$b->id, $b->user->name, $b->user->email, $b->project->title, $b->mode, $b->status, $b->slot->starts_at])],
-            'paiements' => [['ID', 'Participant', 'Formule', 'Montant (FCFA)', 'Moyen', 'Statut', 'Date'],
-                Payment::with('purchase.user')->get()->map(fn ($p) => [$p->id, $p->purchase->user->name, $p->purchase->package_name, $p->amount, $p->method, $p->status, $p->created_at])],
-            'participants' => [['ID', 'Nom', 'E-mail', 'WhatsApp', 'Pays', 'Ville', 'TikTok'],
-                User::where('role', 'PARTICIPANT')->get()->map(fn ($u) => [$u->id, $u->name, $u->email, $u->phone_e164, $u->country, $u->city, $u->tiktok_username])],
+            'reservations' => [['Référence', 'Nom', 'WhatsApp', 'E-mail', 'Boutique', 'Pays', 'Ville', "Domaine d'activité", 'Activité vendue', 'TikTok', 'Pack', 'Mode', 'Statut', 'Passage (heure de Lomé)', 'Montant (FCFA)'],
+                Booking::with('slot', 'package')->get()->map(fn ($b) => [$b->reference, $b->full_name, $b->phone, $b->email, $b->shop_name, $b->country, $b->city, $b->activity_domain, $b->activity_description, $b->tiktok, $b->package->name, $b->mode, $b->status, $b->slot->starts_at->setTimezone($tz)->format('Y-m-d H:i'), $b->amount])],
+            'paiements' => [['ID', 'Réservation', 'Boutique', 'Montant (FCFA)', 'Moyen', 'Opérateur', 'Statut', 'Référence agrégateur', 'Date'],
+                Payment::with('booking')->get()->map(fn ($p) => [$p->id, $p->booking->reference, $p->booking->shop_name, $p->amount, $p->method, $p->operator, $p->status, $p->provider_ref, $p->created_at->setTimezone($tz)->format('Y-m-d H:i')])],
             default => abort(404),
         };
 

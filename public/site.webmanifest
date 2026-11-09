@@ -1,0 +1,24 @@
+{
+    "name": "OCD Live — House of Challenge",
+    "short_name": "OCD Live",
+    "description": "Réservez et payez votre passage dans les lives OCD Live.",
+    "start_url": "/",
+    "display": "browser",
+    "lang": "fr",
+    "background_color": "#ffffff",
+    "theme_color": "#1F1F1F",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}

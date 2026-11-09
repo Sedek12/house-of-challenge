@@ -1,36 +1,51 @@
 import { Card, Field, Pagination, StatusBadge, inputCls } from '@/components/hoc';
+import { Button } from '@/components/ui/button';
 import SiteLayout from '@/layouts/site-layout';
 import { fcfa } from '@/lib/format';
 import { Head, useForm } from '@inertiajs/react';
 
-type P = { id: number; provider: string; method: string; amount: number; status: string; created_at: string; purchase: { package_name: string; user: { name: string; email: string } } };
+type P = { id: number; amount: number; method: string; operator: string | null; status: string; provider_ref: string | null; created_at: string; booking: { reference: string; shop_name: string; full_name: string } };
 
-export default function Payments({ payments, packages, users }: { payments: { data: P[]; links: never[] }; packages: { id: number; name: string; price: number }[]; users: { id: number; name: string; email: string }[] }) {
-    const { data, setData, post, processing, errors } = useForm({ user_id: '', package_id: '', method: 'ESPECES', mode: '' });
-    const err = errors as Record<string, string>;
+export default function Payments({ payments, pending }: { payments: { data: P[]; links: never[] }; pending: { id: number; reference: string; shop_name: string; amount: number }[] }) {
+    const { data, setData, post, processing, errors } = useForm({ booking_id: '', method: 'ESPECES' });
     return (
         <SiteLayout portal="admin" title="Paiements">
             <Head title="Paiements" />
-            <Card className="mb-6">
-                <b>Saisir un paiement manuel</b> <span className="text-xs text-neutral-500">(même effet qu’un paiement en ligne : crédits ajoutés)</span>
-                <form onSubmit={(e) => { e.preventDefault(); post(route('admin.payments.manual')); }} className="mt-3 grid gap-3 md:grid-cols-5">
-                    <Field label="Participant" error={err.user_id}><select className={inputCls} value={data.user_id} onChange={(e) => setData('user_id', e.target.value)} required><option value="" />{users.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select></Field>
-                    <Field label="Formule" error={err.package_id}><select className={inputCls} value={data.package_id} onChange={(e) => setData('package_id', e.target.value)} required><option value="" />{packages.map((p) => <option key={p.id} value={p.id}>{p.name} — {fcfa(p.price)}</option>)}</select></Field>
-                    <Field label="Moyen"><select className={inputCls} value={data.method} onChange={(e) => setData('method', e.target.value)}><option value="ESPECES">Espèces</option><option value="TRANSFERT">Transfert</option></select></Field>
-                    <Field label="Mode (prix)"><select className={inputCls} value={data.mode} onChange={(e) => setData('mode', e.target.value)}><option value="">Prix standard</option><option value="SUR_PLACE">Sur place</option><option value="A_DISTANCE">À distance</option></select></Field>
-                    <button disabled={processing} className="self-end rounded-md bg-[#B05A26] px-3 py-2 text-white">Enregistrer</button>
-                </form>
-            </Card>
+            <div className="mb-3"><Button asChild variant="outline" size="sm"><a href={route('admin.export', 'paiements')}>Exporter en CSV</a></Button></div>
             <div className="overflow-x-auto rounded-lg border bg-white">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-neutral-100"><tr><th className="p-2">#</th><th className="p-2">Participant</th><th className="p-2">Formule</th><th className="p-2">Montant</th><th className="p-2">Moyen</th><th className="p-2">Prestataire</th><th className="p-2">Statut</th><th className="p-2">Date</th></tr></thead>
-                    <tbody>{payments.data.map((p) => (
-                        <tr key={p.id} className="border-t"><td className="p-2">{p.id}</td><td className="p-2">{p.purchase.user.name}</td><td className="p-2">{p.purchase.package_name}</td><td className="p-2">{fcfa(p.amount)}</td>
-                            <td className="p-2">{p.method}</td><td className="p-2">{p.provider}</td><td className="p-2"><StatusBadge status={p.status} /></td><td className="p-2">{new Date(p.created_at).toLocaleString('fr-FR')}</td></tr>
-                    ))}</tbody>
+                    <thead className="bg-neutral-100"><tr>{['Date', 'Réservation', 'Montant', 'Moyen', 'Opérateur', 'Statut', 'Réf. agrégateur'].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>
+                    <tbody>
+                        {payments.data.map((p) => (
+                            <tr key={p.id} className="border-t">
+                                <td className="px-3 py-2">{new Date(p.created_at).toLocaleString('fr-FR', { timeZone: 'Africa/Lome' })}</td>
+                                <td className="px-3 py-2">{p.booking.reference} — {p.booking.shop_name}</td>
+                                <td className="px-3 py-2">{fcfa(p.amount)}</td>
+                                <td className="px-3 py-2">{p.method}</td>
+                                <td className="px-3 py-2">{p.operator ?? '—'}</td>
+                                <td className="px-3 py-2"><StatusBadge status={p.status} /></td>
+                                <td className="px-3 py-2 font-mono text-xs">{p.provider_ref ?? '—'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
                 </table>
             </div>
             <Pagination links={payments.links} />
+
+            <Card className="mt-6 max-w-xl">
+                <h2 className="mb-2 font-bold">Saisir un paiement hors ligne</h2>
+                <p className="mb-3 text-sm text-neutral-600">Espèces ou transfert reçu pour une réservation en attente de paiement : elle est confirmée aussitôt.</p>
+                <form onSubmit={(e) => { e.preventDefault(); post(route('admin.payments.manual'), { preserveScroll: true }); }} className="grid gap-3">
+                    <Field label="Réservation en attente" error={(errors as Record<string, string>).booking_id}>
+                        <select className={inputCls} value={data.booking_id} onChange={(e) => setData('booking_id', e.target.value)} required>
+                            <option value="">Choisir…</option>
+                            {pending.map((b) => <option key={b.id} value={b.id}>{b.reference} — {b.shop_name} ({fcfa(b.amount)})</option>)}
+                        </select>
+                    </Field>
+                    <Field label="Moyen"><select className={inputCls} value={data.method} onChange={(e) => setData('method', e.target.value)}><option value="ESPECES">Espèces</option><option value="TRANSFERT">Transfert</option></select></Field>
+                    <Button disabled={processing || !data.booking_id}>Enregistrer le paiement</Button>
+                </form>
+            </Card>
         </SiteLayout>
     );
 }
