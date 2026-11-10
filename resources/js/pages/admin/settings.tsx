@@ -8,6 +8,10 @@ const LABELS: Record<string, string> = {
     tiktok_show_url: 'Compte TikTok de House of Challenge (adresse complète, ex. https://www.tiktok.com/@nom_du_compte)', studio_address: 'Adresse du studio', studio_maps_url: 'Lien Google Maps du studio',
     onsite_arrival_minutes: 'Arrivée au studio avant le passage (minutes)', hold_minutes: 'Durée du blocage d’un créneau pendant le paiement (minutes)',
     cancel_deadline_hours: 'Délai de report gratuit avant le live (heures)', edit_deadline_hours: 'Modification des produits possible jusqu’à (heures avant le live)',
+    live_price: 'Lives : prix de l’abonnement (FCFA)', live_days: 'Lives : durée de l’abonnement (jours)', live_quota: 'Lives : nombre de lives compris dans l’abonnement',
+    live_per_day: 'Lives : nombre maximum de lives par jour et par vendeur', live_windows: 'Lives : permanences de vérification (heure de Lomé, ex. 08:00-11:00, 18:00-21:00)',
+    live_pending_minutes: 'Lives : une demande non traitée s’annule après (minutes)', live_display_minutes: 'Lives : durée d’affichage d’un live validé (minutes)',
+    live_extend_minutes: 'Lives : prolongation possible, une fois (minutes)', live_reminder_days: 'Lives : rappel avant la fin de l’abonnement (jours)',
     concept_markdown: 'Présentation du concept (page d’accueil)', faq_markdown: 'FAQ de la page d’accueil', legal_markdown: 'Mentions légales et confidentialité',
 };
 

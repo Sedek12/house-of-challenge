@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LivePost;
 use App\Models\Package;
 use App\Models\Slot;
 use App\Services\Notifier;
@@ -17,6 +18,7 @@ class PublicController extends Controller
             'faq' => Settings::get('faq_markdown'),
             'concept' => Settings::get('concept_markdown'),
             'hero_image' => Settings::get('hero_image_url'),
+            'live_count' => LivePost::onAir()->count(),
         ]);
     }
 

@@ -4,7 +4,9 @@ import { OcdBand } from '@/components/ocd-band';
 import { Button } from '@/components/ui/button';
 import SiteLayout from '@/layouts/site-layout';
 import { fcfa, tiktokHandle } from '@/lib/format';
+import { LiveDot } from '@/components/live';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { ArrowRight } from 'lucide-react';
 
 const STEPS = [
     ['Choisissez votre package', 'Selon la durée de passage et le nombre de produits.'],
@@ -13,7 +15,7 @@ const STEPS = [
     ['Payez par Flooz ou T-Money', 'Votre place est confirmée aussitôt, sans créer de compte.'],
 ];
 
-export default function Home({ packages, faq, concept, hero_image }: { packages: Pkg[]; faq: string; concept: string; hero_image: string }) {
+export default function Home({ packages, faq, concept, hero_image, live_count = 0 }: { packages: Pkg[]; faq: string; concept: string; hero_image: string; live_count?: number }) {
     const { site } = usePage().props as unknown as { site: { tiktok: string; logo: string } };
     const prices = packages.map((p) => p.price);
     const [minPrice, maxPrice] = [Math.min(...prices), Math.max(...prices)];
@@ -29,8 +31,15 @@ export default function Home({ packages, faq, concept, hero_image }: { packages:
                     <p className="mt-3 text-neutral-600">Bovann lance le live sur le TikTok de House of Challenge : vendeurs et entrepreneurs viennent y présenter leurs produits, pour vendre et gagner de l’argent.</p>
                     <div className="mt-6 flex flex-wrap gap-3">
                         <ReserveButton>Réserver mon passage</ReserveButton>
+                        <Button asChild className="bg-[#1F1F1F] text-white hover:bg-black [forced-color-adjust:none]">
+                            <Link href={route('lives')}><LiveDot className="size-2" />Voir les lives en direct{live_count > 0 ? ` (${live_count})` : ''}</Link>
+                        </Button>
                         <Button asChild variant="soft"><a href="#concept">Découvrir le concept</a></Button>
                     </div>
+                    <p className="mt-4 text-sm text-neutral-600">
+                        Vous vendez déjà en live sur TikTok ?{' '}
+                        <Link href={route('live.mine')} className="inline-flex items-center gap-1 font-semibold text-[#B85600] hover:underline">Mettre mon live en avant <ArrowRight className="size-3.5" aria-hidden /></Link>
+                    </p>
                 </div>
                 {hero_image ? (
                     <img src={hero_image} alt="Le studio OCD Live : mur lumineux en forme de carte de l’Afrique" width={436} height={418} fetchPriority="high" className="aspect-square w-full max-w-md justify-self-center rounded-lg object-cover shadow-md md:justify-self-end" />
@@ -48,7 +57,7 @@ export default function Home({ packages, faq, concept, hero_image }: { packages:
                 <div className="md:col-span-2"><Card className="h-full"><Markdown text={concept ?? ''} /></Card></div>
                 <div className="flex flex-col justify-center gap-3 rounded-lg bg-[#1F1F1F] p-5 text-white shadow-sm">
                     <div className="text-xl font-bold">Suivez le live</div>
-                    <p className="text-sm text-neutral-300">Les lives ont lieu sur le compte TikTok de House of Challenge, avec Bovann. Ce site sert uniquement à réserver votre passage.</p>
+                    <p className="text-sm text-neutral-300">Les lives ont lieu sur le compte TikTok de House of Challenge, avec Bovann. Réservez ici votre passage.</p>
                     <Button asChild><a href={site.tiktok} target="_blank" rel="noreferrer">{tiktokHandle(site.tiktok) ? `Voir ${tiktokHandle(site.tiktok)} sur TikTok` : 'Voir House of Challenge sur TikTok'}</a></Button>
                 </div>
             </section>

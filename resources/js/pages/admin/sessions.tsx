@@ -38,6 +38,17 @@ export default function Sessions({ sessions }: { sessions: { data: S[]; links: n
                             <Field label="Nombre de semaines" error={err.weeks}><input className={inputCls} inputMode="numeric" value={data.weeks} onChange={(e) => setData('weeks', e.target.value)} /></Field>
                         </>
                     )}
+                    <div className="flex flex-wrap items-center gap-2 md:col-span-3">
+                        <span className="text-sm font-medium">Plage horaire :</span>
+                        {([['Matin', '09:00', '12:00'], ['Après-midi', '14:00', '17:00'], ['Soirée', '19:00', '22:00']] as const).map(([label, from, to]) => {
+                            const on = data.start_time === from && data.end_time === to;
+                            return (
+                                <button key={label} type="button" onClick={() => { setData('start_time', from); setData('end_time', to); }}
+                                    className={`rounded-full border px-3 py-1 text-sm ${on ? 'border-neutral-900 bg-neutral-900 text-white' : 'bg-white hover:border-neutral-500'}`}>{label} · {from.replace(':', ' h ')} à {to.replace(':', ' h ')}</button>
+                            );
+                        })}
+                        <span className="text-xs text-neutral-500">Pour avoir matin et soir le même jour, ouvrez les deux plages l’une après l’autre.</span>
+                    </div>
                     <Field label="Début (heure de Lomé)" error={err.start_time}><input type="time" className={inputCls} value={data.start_time} onChange={(e) => setData('start_time', e.target.value)} /></Field>
                     <Field label="Fin" error={err.end_time}><input type="time" className={inputCls} value={data.end_time} onChange={(e) => setData('end_time', e.target.value)} /></Field>
                     <Field label="Durée d’un passage (min)" error={err.slot_minutes}><input className={inputCls} inputMode="numeric" value={data.slot_minutes} onChange={(e) => setData('slot_minutes', e.target.value)} /></Field>

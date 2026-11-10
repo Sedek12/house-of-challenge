@@ -156,18 +156,24 @@ class DatabaseSeeder extends Seeder
             'password' => $u->exists ? $u->password : Hash::make('password'),
         ])->save();
 
-        if (LiveSession::count() === 0) {
-            $tz = config('app.display_timezone');
-            foreach (range(1, 14) as $i) {
-                $day = now($tz)->addDays($i);
-                if ($day->dayOfWeekIso === 7) {
+        // Deux plages par jour, du lundi au samedi : le matin (9 h à 12 h, pour ceux qui viennent au studio en journée) et la soirée (19 h à 22 h).
+        // Relançable : une plage déjà existante n'est jamais recréée.
+        $tz = config('app.display_timezone');
+        foreach (range(1, 14) as $i) {
+            $day = now($tz)->addDays($i);
+            if ($day->dayOfWeekIso === 7) {
+                continue;
+            }
+            $d = $day->format('Y-m-d');
+            foreach ([['matin', '09:00', '12:00'], ['soirée', '19:00', '22:00']] as [$label, $from, $to]) {
+                $start = Carbon::createFromFormat('Y-m-d H:i', "$d $from", $tz)->utc();
+                if (LiveSession::where('starts_at', $start)->exists()) {
                     continue;
                 }
-                $d = $day->format('Y-m-d');
                 $s = LiveSession::create([
-                    'title' => 'Live OCD — '.$day->locale('fr')->isoFormat('dddd D MMMM'),
-                    'starts_at' => Carbon::createFromFormat('Y-m-d H:i', "$d 19:00", $tz)->utc(),
-                    'ends_at' => Carbon::createFromFormat('Y-m-d H:i', "$d 22:00", $tz)->utc(),
+                    'title' => 'Live OCD — '.$day->locale('fr')->isoFormat('dddd D MMMM').' ('.$label.')',
+                    'starts_at' => $start,
+                    'ends_at' => Carbon::createFromFormat('Y-m-d H:i', "$d $to", $tz)->utc(),
                     'accepted_modes' => ['SUR_PLACE', 'A_DISTANCE'], 'slot_minutes' => 15, 'break_minutes' => 0,
                 ]);
                 app(SlotService::class)->generate($s);

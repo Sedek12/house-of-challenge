@@ -1,6 +1,6 @@
 import { DEVELOPER, ROLE_LABEL, readableOn, Shared } from '@/lib/layout';
 import { Link, router, usePage } from '@inertiajs/react';
-import { CalendarDays, ClipboardList, Clock, CreditCard, ExternalLink, LogOut, LucideIcon, Menu, Package, Settings, X } from 'lucide-react';
+import { CalendarDays, ClipboardList, Clock, CreditCard, ExternalLink, LogOut, LucideIcon, Menu, Package, Radio, Settings, X } from 'lucide-react';
 import { CSSProperties, PropsWithChildren, ReactNode, useState } from 'react';
 
 type Item = { label: string; name: string; icon: LucideIcon; also?: string[] };
@@ -10,6 +10,7 @@ const NAV: Record<'admin' | 'team', Item[]> = {
     admin: [
         { label: 'Planning', name: 'admin.planning', icon: CalendarDays, also: ['team.booking'] },
         { label: 'Réservations', name: 'admin.bookings', icon: ClipboardList },
+        { label: 'Lives à valider', name: 'admin.lives', icon: Radio },
         { label: 'Créneaux', name: 'admin.sessions', icon: Clock },
         { label: 'Packages', name: 'admin.packages', icon: Package },
         { label: 'Paiements', name: 'admin.payments', icon: CreditCard },

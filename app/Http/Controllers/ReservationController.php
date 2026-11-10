@@ -277,7 +277,7 @@ class ReservationController extends Controller
         $payment = Payment::with('booking.package')->where('provider_ref', $request->query('ref'))->firstOrFail();
 
         return Inertia::render('payment/mock', [
-            'reference' => $payment->provider_ref, 'amount' => $payment->amount, 'name' => $payment->booking->package->name,
+            'reference' => $payment->provider_ref, 'amount' => $payment->amount, 'name' => $payment->booking?->package->name ?? 'Abonnement Lives OCD',
         ]);
     }
 
@@ -286,7 +286,7 @@ class ReservationController extends Controller
     {
         abort_unless(config('services.payment.provider') === 'mock' && ! app()->isProduction(), 404);
         $d = $request->validate(['ref' => 'required', 'result' => 'required|in:PAID,FAILED']);
-        $payment = Payment::with('booking')->where('provider_ref', $d['ref'])->firstOrFail();
+        $payment = Payment::with('booking', 'liveSubscription')->where('provider_ref', $d['ref'])->firstOrFail();
 
         $body = json_encode(['providerRef' => $d['ref'], 'status' => $d['result'], 'amount' => $payment->amount]);
         $fake = Request::create('/api/webhooks/payment', 'POST', [], [], [], [], $body);
@@ -296,7 +296,9 @@ class ReservationController extends Controller
             $this->payments->handleEvent($v['event']['providerRef'], $v['event']['status'], $v['event']['amount']);
         }
 
-        return redirect()->route('payment.return', ['token' => $payment->booking->tracking_token]);
+        return $payment->liveSubscription
+            ? redirect()->route('live.payment.return', ['reference' => $payment->liveSubscription->reference])
+            : redirect()->route('payment.return', ['token' => $payment->booking->tracking_token]);
     }
 
     public function webhook(Request $request)

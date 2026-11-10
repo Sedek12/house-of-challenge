@@ -39,5 +39,6 @@ export const STATUS_LABEL: Record<string, string> = {
     ANNULEE: 'Annulée', ANNULEE_PAR_ORGANISATEUR: 'Annulée par l’organisation',
     EN_ATTENTE: 'En attente', PAYE: 'Payé', ECHOUE: 'Échoué', ANNULE: 'Annulé', REMBOURSE: 'Remboursé',
     PUBLIEE: 'Publiée', REFUSEE: 'Refusée', EXPIREE: 'Expirée', DEPUBLIEE: 'Dépubliée',
+    EN_LIGNE: 'Affiché', TERMINE: 'Terminé', REFUSE: 'Refusé', EXPIRE: 'Expiré', ACTIVE: 'Actif',
     DISPONIBLE: 'Disponible', RESERVE: 'Réservé', BLOQUE: 'Bloqué', PROGRAMMEE: 'Programmée', TERMINEE: 'Terminée',
 };

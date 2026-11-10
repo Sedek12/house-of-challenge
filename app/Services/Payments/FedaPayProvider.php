@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 /**
  * Adaptateur FedaPay (Bénin / Togo, XOF, Mobile Money + cartes).
@@ -35,7 +36,9 @@ class FedaPayProvider implements PaymentProvider
             'amount' => $input['amount'],
             'currency' => ['iso' => $input['currency']],
             'callback_url' => $input['returnUrl'],
-            'merchant_reference' => $input['orderId'],
+            // FedaPay exige une référence unique par transaction : un suffixe aléatoire évite le refus lors d'une nouvelle tentative
+            // ou quand plusieurs bases (locale, serveur) partagent le même compte.
+            'merchant_reference' => $input['orderId'].'-'.Str::lower(Str::random(8)),
             'customer' => ['firstname' => $first, 'lastname' => $last ?: $first, 'email' => $input['customer']['email']],
         ])->throw()->json();
 

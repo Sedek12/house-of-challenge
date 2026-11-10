@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Mail\GenericMail;
 use App\Models\Booking;
+use App\Models\LivePost;
+use App\Models\LiveSubscription;
 use App\Models\User;
 use App\Support\Countries;
 use Illuminate\Support\Carbon;
@@ -101,6 +103,54 @@ class Notifier
             $lines[] = 'Une question ? WhatsApp : '.$wa;
         }
         self::send($u->email, 'Bienvenue sur OCD Live — votre compte est créé', $lines, null, ['label' => 'Réserver mon passage', 'url' => route('reserve')]);
+    }
+
+    /* ---------- Annuaire des lives ---------- */
+
+    public static function liveSubscriptionActivated(LiveSubscription $s): void
+    {
+        $s->loadMissing('user');
+        self::send($s->user->email, 'Abonnement Lives activé — OCD Live', [
+            'Bonjour '.$s->user->name.',',
+            'Votre abonnement est actif jusqu\'au '.self::format($s->ends_at).' (heure de Lomé).',
+            'Il comprend '.$s->quota.' lives, au plus '.Settings::int('live_per_day').' par jour. Montant payé : '.number_format($s->amount, 0, ',', ' ').' FCFA (référence '.$s->reference.').',
+            'Comment faire : lancez votre live sur TikTok, puis envoyez-nous son lien pendant nos permanences ('.LiveHub::windowsLabel().', heure de Lomé). Après vérification, votre live apparaît sur OCD Live.',
+        ], null, ['label' => 'Envoyer mon live', 'url' => route('live.mine')]);
+    }
+
+    public static function liveApproved(LivePost $p): void
+    {
+        $p->loadMissing('user', 'subscription');
+        self::send($p->user->email, 'Votre live est en ligne sur OCD Live', [
+            'Bonjour '.$p->user->name.',',
+            'Votre live « '.$p->seller_name.' » est affiché sur OCD Live jusqu\'à '.self::format($p->live_until).'.',
+            'Encore en live à ce moment-là ? Vous pouvez prolonger une fois depuis votre page « Mon live ».',
+            'Lives restants sur votre abonnement : '.$p->subscription->remaining().' sur '.$p->subscription->quota.'.',
+        ], null, ['label' => 'Voir mon live', 'url' => route('live.mine')]);
+    }
+
+    public static function liveRejected(LivePost $p): void
+    {
+        $p->loadMissing('user');
+        $lines = [
+            'Bonjour '.$p->user->name.',',
+            'Votre live n\'a pas pu être mis en avant. Motif : '.$p->reject_reason,
+            'Ce live n\'est pas décompté de votre abonnement. Corrigez puis renvoyez votre lien pendant nos permanences ('.LiveHub::windowsLabel().').',
+        ];
+        if ($wa = self::whatsappUrl()) {
+            $lines[] = 'Besoin d\'aide ? WhatsApp : '.$wa;
+        }
+        self::send($p->user->email, 'Votre live n\'a pas été validé — OCD Live', $lines, null, ['label' => 'Renvoyer mon live', 'url' => route('live.mine')]);
+    }
+
+    public static function liveSubscriptionEnding(LiveSubscription $s): void
+    {
+        $s->loadMissing('user');
+        self::send($s->user->email, 'Votre abonnement Lives se termine bientôt — OCD Live', [
+            'Bonjour '.$s->user->name.',',
+            'Votre abonnement se termine le '.self::format($s->ends_at).'. Il vous reste '.$s->remaining().' live(s) à utiliser d\'ici là.',
+            'Pour continuer à être mis en avant, renouvelez-le : '.number_format(Settings::int('live_price'), 0, ',', ' ').' FCFA pour '.Settings::int('live_days').' jours et '.Settings::int('live_quota').' lives.',
+        ], null, ['label' => 'Renouveler', 'url' => route('live.mine')]);
     }
 
     /** Alerte l'équipe d'une nouvelle réservation confirmée, avec un lien vers le tableau de bord. */

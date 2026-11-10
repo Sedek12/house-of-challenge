@@ -43,7 +43,7 @@ class AccountController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('reserve')->with('success', 'Votre compte est créé. Vos informations seront reprises à chaque réservation.');
+        return redirect()->intended(route('reserve'))->with('success', 'Votre compte est créé. Vos informations seront reprises à chaque réservation.');
     }
 
     /** @param array{name:string,email:string,password:string,country:string,phone:string} $d */

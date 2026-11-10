@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminController as A;
+use App\Http\Controllers\LiveController as L;
 use App\Http\Controllers\PublicController;
 use App\Http\Controllers\ReservationController as R;
 use App\Http\Controllers\TeamController as T;
@@ -15,6 +16,17 @@ Route::get('/a-propos', [PublicController::class, 'about'])->name('about');
 Route::get('/packages', [PublicController::class, 'packagesPage'])->name('packages');
 Route::get('/contact', [PublicController::class, 'contact'])->name('contact');
 Route::get('/mentions-legales', [PublicController::class, 'legal'])->name('legal');
+
+/* ----- Annuaire des lives TikTok ----- */
+Route::get('/lives', [L::class, 'index'])->name('lives');
+Route::get('/mon-live', [L::class, 'mine'])->name('live.mine');
+Route::middleware(['auth', 'role:VENDOR'])->prefix('mon-live')->name('live.')->group(function () {
+    Route::post('/', [L::class, 'submit'])->middleware('throttle:10,1')->name('submit');
+    Route::post('/abonnement', [L::class, 'subscribe'])->middleware('throttle:10,1')->name('subscribe');
+    Route::get('/abonnement/retour/{reference}', [L::class, 'paymentReturn'])->name('payment.return');
+    Route::post('/{post}/prolonger', [L::class, 'extend'])->name('extend');
+    Route::post('/{post}/terminer', [L::class, 'finish'])->name('finish');
+});
 
 /* ----- Compte vendeur (optionnel) ----- */
 Route::middleware('guest')->group(function () {
@@ -75,6 +87,10 @@ Route::middleware(['auth', 'role:ADMIN'])->prefix('admin')->name('admin.')->grou
     Route::post('/parametres', [A::class, 'saveSettings'])->name('settings.save');
     Route::post('/parametres/image/{kind}', [A::class, 'uploadImage'])->name('settings.image');
     Route::get('/export/{type}', [A::class, 'export'])->name('export');
+    Route::get('/lives', [L::class, 'admin'])->name('lives');
+    Route::post('/lives/{post}/valider', [L::class, 'approve'])->name('lives.approve');
+    Route::post('/lives/{post}/refuser', [L::class, 'reject'])->name('lives.reject');
+    Route::post('/lives/{post}/retirer', [L::class, 'remove'])->name('lives.remove');
 });
 
 Route::get('/robots.txt', fn () => response(
@@ -90,7 +106,7 @@ Sitemap: '.url('/sitemap.xml').'
 ));
 
 Route::get('/sitemap.xml', function () {
-    $urls = collect(['home', 'about', 'packages', 'contact', 'reserve', 'legal'])->map(fn ($r) => route($r));
+    $urls = collect(['home', 'lives', 'about', 'packages', 'contact', 'reserve', 'legal'])->map(fn ($r) => route($r));
     $xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         .$urls->map(fn ($u) => '<url><loc>'.e($u).'</loc></url>')->implode('').'</urlset>';
 

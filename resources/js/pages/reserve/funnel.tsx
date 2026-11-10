@@ -1,11 +1,13 @@
+import { BookingTicket, LivePhonePreview } from '@/components/booking-ticket';
 import { CountrySelect, PhoneInput } from '@/components/country-fields';
-import { Card, Field, ModeBadge, PackageCard, Pkg, SlotDto, SlotPicker, inputCls } from '@/components/hoc';
+import { Card, Field, ModeBadge, PackageCard, PickLabel, Pkg, SlotDto, SlotPicker, inputCls } from '@/components/hoc';
 import { emptyProduct, ProductRow, ProductsEditor } from '@/components/products-editor';
 import { Button } from '@/components/ui/button';
 import SiteLayout from '@/layouts/site-layout';
 import { buildPhone, Country, flag, splitPhone } from '@/lib/countries';
 import { fcfa, fmtLome, MODE_LABEL } from '@/lib/format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 type Profile = { name: string; email: string; phone: string | null; country: string | null };
@@ -18,7 +20,7 @@ type Form = {
     create_account: boolean; password: string; consent: boolean; products: ProductRow[];
 };
 
-const STEPS = ['Package', 'Créneau', 'Informations', 'Paiement'];
+const STEPS = ['Package', 'Créneau', 'Business', 'Vérification'];
 const INFO_FIELDS = ['full_name', 'phone', 'email', 'shop_id', 'shop_name', 'city', 'activity_domain', 'activity_description', 'tiktok', 'host_notes', 'create_account', 'password', 'consent', 'products'];
 
 /** Produits mémorisés de la boutique, prêts à être repris dans la réservation (photos comprises). */
@@ -140,12 +142,19 @@ export default function Funnel({ packages, slots, pack, hold_minutes, domains, c
         <section className="grid gap-3 md:grid-cols-2">
             <Field label="Nom de la boutique" error={err.shop_name}><input className={inputCls} value={data.shop_name} onChange={(e) => setData('shop_name', e.target.value)} /></Field>
             <Field label="Ville de la boutique" error={err.city}><input className={inputCls} autoComplete="address-level2" value={data.city} onChange={(e) => setData('city', e.target.value)} /></Field>
-            <Field label="Domaine d’activité" error={err.activity_domain}>
-                <select className={inputCls} value={data.activity_domain} onChange={(e) => setData('activity_domain', e.target.value)}>
-                    <option value="">Choisir…</option>
-                    {domains.map((d) => <option key={d}>{d}</option>)}
-                </select>
-            </Field>
+            <div className="md:col-span-2">
+                <div className="mb-1.5 text-sm font-medium" id="domain-label">Vous vendez quoi ? (domaine d’activité)</div>
+                <div role="radiogroup" aria-labelledby="domain-label" className="flex flex-wrap gap-2">
+                    {domains.map((d) => {
+                        const on = data.activity_domain === d;
+                        return (
+                            <button key={d} type="button" role="radio" aria-checked={on} onClick={() => setData('activity_domain', d)}
+                                className={`rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${on ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white text-neutral-700 hover:border-neutral-500'}`}>{d}</button>
+                        );
+                    })}
+                </div>
+                {err.activity_domain && <span className="text-sm text-red-600">{err.activity_domain}</span>}
+            </div>
             <Field label="Compte TikTok (facultatif)" error={err.tiktok}><input className={inputCls} placeholder="@votre_compte" value={data.tiktok} onChange={(e) => setData('tiktok', e.target.value)} /></Field>
             <div className="md:col-span-2">
                 <Field label={`Que vendez-vous ? (${data.activity_description.length}/300)`} error={err.activity_description}>
@@ -163,28 +172,46 @@ export default function Funnel({ packages, slots, pack, hold_minutes, domains, c
                     Déjà un compte ? <Link className="font-semibold text-[#B85600] underline" href={route('login')}>Connectez-vous</Link> pour retrouver votre boutique et vos produits.
                 </p>
             )}
-            <ol className="mb-6 flex gap-1.5 text-[11px] sm:gap-2 sm:text-sm">
-                {STEPS.map((s, i) => (
-                    <li key={s} className={`flex-1 rounded px-1 py-1 text-center sm:px-2 ${i + 1 === step ? 'bg-primary text-white' : i + 1 < step ? 'bg-green-100' : 'bg-neutral-200'}`}>{i + 1}. {s}</li>
-                ))}
-            </ol>
+            {/* Étapes : une ligne reliant les cercles ; les étapes déjà faites se rouvrent d'un clic (sauf à la dernière étape). */}
+            <nav aria-label="Étapes de la réservation" className="mx-auto mb-8 max-w-2xl">
+                <ol className="flex items-start">
+                    {STEPS.map((s, i) => {
+                        const n = i + 1;
+                        const done = n < step;
+                        const current = n === step;
+                        return (
+                            <li key={s} aria-current={current ? 'step' : undefined} className="relative flex flex-1 flex-col items-center text-center">
+                                {i > 0 && <span aria-hidden className={`absolute left-[-50%] right-[50%] top-4 h-0.5 -translate-y-1/2 ${n <= step ? 'bg-neutral-900' : 'bg-neutral-200'}`} />}
+                                <button type="button" disabled={!done || step >= STEPS.length} onClick={() => go(n)} aria-label={`${s}${done ? ' (terminé)' : ''}`}
+                                    className={`relative z-10 flex size-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${current ? 'bg-primary text-primary-foreground ring-4 ring-primary/25 [forced-color-adjust:none]' : done ? 'bg-neutral-900 text-white enabled:hover:bg-neutral-700' : 'border-2 border-neutral-300 bg-white text-neutral-400'}`}>
+                                    {done ? <Check className="size-4" aria-hidden /> : n}
+                                </button>
+                                <span className={`mt-2 text-xs leading-tight sm:text-sm ${current ? 'font-semibold text-neutral-900' : done ? 'text-neutral-700' : 'text-neutral-400'}`}>{s}</span>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </nav>
 
             {/* Rappel du package choisi : les autres packages disparaissent, « Changer » y ramène. */}
             {step > 1 && pkg && (
-                <Card className="mb-5 flex items-center justify-between gap-3 text-sm">
+                <Card className="mb-5 flex items-center justify-between gap-3 text-sm lg:hidden">
                     <span><span className="text-neutral-500">Package choisi :</span> <b>{pkg.name}</b> · {fcfa(pkg.price)} · {pkg.duration_minutes} min</span>
                     {step < 4 && <button type="button" className="shrink-0 font-semibold text-[#B85600] underline" onClick={() => go(1)}>Changer</button>}
                 </Card>
             )}
 
+            {/* À partir du créneau, sur ordinateur : la fiche de réservation et l'aperçu du live restent visibles à droite. */}
+            <div className={step > 1 ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8' : ''}>
+            <div className="min-w-0">
             {step === 1 && (
                 <section>
                     <h2 className="mb-1 text-lg font-bold">Choisissez votre package</h2>
                     <p className="mb-3 text-sm text-neutral-600">Touchez un package pour passer au choix du créneau.</p>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        {packages.map((p) => (
-                            <button key={p.id} type="button" className="text-left" aria-label={`Choisir ${p.name}`} onClick={() => choosePack(p)}>
-                                <PackageCard pkg={p} selected={chosen && p.id === data.package_id} />
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {packages.map((p, i) => (
+                            <button key={p.id} type="button" className="h-full rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" aria-label={`Choisir ${p.name}`} onClick={() => choosePack(p)}>
+                                <PackageCard pkg={p} rank={i} total={packages.length} selected={chosen && p.id === data.package_id} action={<PickLabel />} />
                             </button>
                         ))}
                     </div>
@@ -245,7 +272,10 @@ export default function Funnel({ packages, slots, pack, hold_minutes, domains, c
                     )}
 
                     <section className="grid gap-3">
-                        <h2 className="text-lg font-bold">Votre boutique</h2>
+                        <div>
+                            <h2 className="text-xl font-bold">Parlez-nous de votre business</h2>
+                            <p className="mt-1 text-sm text-neutral-600">Le nom, le numéro et la ville de votre boutique pourront être présentés pendant votre live : le public doit pouvoir vous retrouver.</p>
+                        </div>
                         {profile && shops.length > 0 && (
                             <Field label="Boutique de cette réservation">
                                 <select className={inputCls} value={String(shopId)} onChange={(e) => chooseShop(e.target.value)}>
@@ -293,17 +323,38 @@ export default function Funnel({ packages, slots, pack, hold_minutes, domains, c
             )}
 
             {step === 4 && pkg && slot && (
-                <Card className="grid max-w-xl gap-2">
-                    <h2 className="text-lg font-bold">Récapitulatif</h2>
-                    <div>{pkg.name} — {pkg.duration_minutes} min, {data.products.length} produit(s)</div>
-                    <div>{fmtLome(slot.starts_at)} <ModeBadge mode={data.mode} /></div>
-                    <div>{data.shop_name} · {profile?.name ?? data.full_name}</div>
-                    <div className="flag-font">{country && <>{flag(country.code)} {country.name} · </>}{profile?.phone ?? data.phone}</div>
-                    {data.create_account && !auth.user && <div className="text-sm text-neutral-600">Un compte sera créé avec l’e-mail {data.email}.</div>}
-                    <div className="text-2xl font-extrabold text-[#B85600]">{fcfa(pkg.price)}</div>
-                    <p className="text-sm text-neutral-600">Paiement par Flooz ou T-Money. Votre créneau est bloqué {hold_minutes} minutes pendant le paiement ; il est confirmé dès que le paiement est reçu.</p>
-                    <Button disabled={processing} onClick={submit} size="lg">{processing ? 'Redirection vers le paiement…' : `Payer ${fcfa(pkg.price)}`}</Button>
-                </Card>
+                <section className="grid gap-5">
+                    <div>
+                        <h2 className="text-xl font-bold">On vérifie tout</h2>
+                        <p className="mt-1 text-sm text-neutral-600">Relisez votre réservation. Un oubli ? Touchez « Modifier » sur la ligne concernée, vos réponses sont conservées.</p>
+                    </div>
+
+                    <dl className="divide-y rounded-lg border bg-white text-sm">
+                        {([
+                            ['Package', <><b>{pkg.name}</b> — {pkg.duration_minutes} min, jusqu’à {pkg.max_products} produits</>, 1],
+                            ['Passage', <><b>{fmtLome(slot.starts_at)}</b> <ModeBadge mode={data.mode} /></>, 2],
+                            ['Business', <><b>{data.shop_name}</b> · {data.city}<div className="text-neutral-600">{data.activity_domain}{data.activity_description ? ` — ${data.activity_description}` : ''}</div>{data.tiktok && <div className="text-neutral-600">TikTok : {data.tiktok}</div>}</>, 3],
+                            ['Vous', <><b>{profile?.name ?? data.full_name}</b><div className="flag-font text-neutral-600">{country && <>{flag(country.code)} {country.name} · </>}{profile?.phone ?? data.phone}</div><div className="text-neutral-600">{profile?.email ?? data.email}</div></>, 3],
+                            [`Produits (${data.products.length})`, <ul className="grid gap-1">{data.products.map((p, i) => <li key={i}><b>{p.name}</b> — {fcfa(Number(p.live_price) || 0)} <span className="text-neutral-500">(au lieu de {fcfa(Number(p.price) || 0)}) × {p.quantity}</span></li>)}</ul>, 3],
+                        ] as [string, React.ReactNode, number][]).map(([label, content, target]) => (
+                            <div key={label} className="grid grid-cols-[6.5rem_1fr_auto] items-start gap-3 px-4 py-3">
+                                <dt className="text-neutral-500">{label}</dt>
+                                <dd className="min-w-0">{content}</dd>
+                                <button type="button" onClick={() => go(target)} className="font-semibold text-[#B85600] underline">Modifier</button>
+                            </div>
+                        ))}
+                    </dl>
+                    {data.create_account && !auth.user && <p className="text-sm text-neutral-600">Un compte sera créé avec l’e-mail {data.email}.</p>}
+
+                    <div className="grid gap-3 rounded-lg border bg-white p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                        <div>
+                            <div className="text-sm text-neutral-500">Total à payer</div>
+                            <div className="text-3xl font-extrabold">{fcfa(pkg.price)}</div>
+                            <p className="mt-1 text-sm text-neutral-600">Paiement par Mobile Money. Votre créneau est bloqué {hold_minutes} minutes pendant le paiement ; il est confirmé dès que le paiement est reçu.</p>
+                        </div>
+                        <Button disabled={processing} onClick={submit} size="lg">{processing ? 'Redirection vers le paiement…' : `Payer ${fcfa(pkg.price)}`}</Button>
+                    </div>
+                </section>
             )}
 
             {step === 2 ? (
@@ -327,6 +378,14 @@ export default function Funnel({ packages, slots, pack, hold_minutes, domains, c
                     </div>
                 </>
             )}
+            </div>
+            {step > 1 && (
+                <aside aria-label="Résumé de votre réservation" className="hidden gap-6 lg:sticky lg:top-24 lg:grid">
+                    <BookingTicket pkgName={pkg?.name} minutes={pkg?.duration_minutes} slotAt={slot?.starts_at} mode={data.mode || undefined} total={pkg?.price} />
+                    <LivePhonePreview shopName={savedShop?.name ?? data.shop_name} phone={profile?.phone ?? data.phone} city={savedShop?.city ?? data.city} />
+                </aside>
+            )}
+            </div>
         </SiteLayout>
     );
 }

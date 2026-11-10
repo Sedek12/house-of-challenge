@@ -43,6 +43,16 @@ class User extends Authenticatable
         return $this->hasMany(Shop::class);
     }
 
+    public function liveSubscriptions(): HasMany
+    {
+        return $this->hasMany(LiveSubscription::class);
+    }
+
+    public function livePosts(): HasMany
+    {
+        return $this->hasMany(LivePost::class);
+    }
+
     public function isVendor(): bool
     {
         return $this->role === 'VENDOR';

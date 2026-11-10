@@ -38,6 +38,16 @@ Réservez votre créneau sur ce site, décrivez vos produits à l\'avance et pay
         'edit_deadline_hours' => '24',
         'hold_minutes' => '15',
         'onsite_arrival_minutes' => '30',
+        // Annuaire des lives TikTok (abonnement, quota, permanences de vérification, durée d'affichage).
+        'live_price' => '5000',
+        'live_days' => '30',
+        'live_quota' => '15',
+        'live_per_day' => '1',
+        'live_windows' => '08:00-11:00, 18:00-21:00',
+        'live_pending_minutes' => '60',
+        'live_display_minutes' => '120',
+        'live_extend_minutes' => '60',
+        'live_reminder_days' => '3',
         'faq_markdown' => "## Comment ça marche ?\nChoisissez un package, un créneau libre, remplissez le formulaire avec vos produits et payez par Flooz ou T-Money. Vous recevez aussitôt votre confirmation et votre lien de suivi.\n\n## Puis-je modifier mes produits ?\nOui, depuis votre lien de suivi, jusqu'à 24 h avant le live.\n\n## Puis-je reporter mon passage ?\nUn report est gratuit si la demande arrive au moins 48 h avant le live : contactez-nous sur WhatsApp.\n\n## Et si je ne me présente pas ?\nLe passage est noté « Absent » et le paiement est conservé.",
         'legal_markdown' => "## Mentions légales\nContenu à compléter par OCD Live (éditeur, hébergeur, contact).\n\n## Politique de confidentialité\nNous collectons uniquement les données nécessaires à votre réservation (nom, téléphone WhatsApp, e-mail, boutique, produits), conformément à la loi togolaise n° 2019-014 sur la protection des données personnelles. Contenu à compléter.",
     ];

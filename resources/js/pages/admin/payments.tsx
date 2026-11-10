@@ -4,7 +4,7 @@ import SiteLayout from '@/layouts/site-layout';
 import { fcfa } from '@/lib/format';
 import { Head, useForm } from '@inertiajs/react';
 
-type P = { id: number; amount: number; method: string; operator: string | null; status: string; provider_ref: string | null; created_at: string; booking: { reference: string; shop_name: string; full_name: string } };
+type P = { id: number; amount: number; method: string; operator: string | null; status: string; provider_ref: string | null; created_at: string; booking: { reference: string; shop_name: string; full_name: string } | null; live_subscription: { reference: string; user: { name: string } | null } | null };
 
 export default function Payments({ payments, pending }: { payments: { data: P[]; links: never[] }; pending: { id: number; reference: string; shop_name: string; amount: number }[] }) {
     const { data, setData, post, processing, errors } = useForm({ booking_id: '', method: 'ESPECES' });
@@ -19,7 +19,7 @@ export default function Payments({ payments, pending }: { payments: { data: P[];
                         {payments.data.map((p) => (
                             <tr key={p.id} className="border-t">
                                 <td className="px-3 py-2">{new Date(p.created_at).toLocaleString('fr-FR', { timeZone: 'Africa/Lome' })}</td>
-                                <td className="px-3 py-2">{p.booking.reference} — {p.booking.shop_name}</td>
+                                <td className="px-3 py-2">{p.booking ? `${p.booking.reference} — ${p.booking.shop_name}` : p.live_subscription ? `Abonnement Lives ${p.live_subscription.reference} — ${p.live_subscription.user?.name ?? ''}` : '—'}</td>
                                 <td className="px-3 py-2">{fcfa(p.amount)}</td>
                                 <td className="px-3 py-2">{p.method}</td>
                                 <td className="px-3 py-2">{p.operator ?? '—'}</td>

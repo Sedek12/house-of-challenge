@@ -18,4 +18,10 @@ class Payment extends Model
     {
         return $this->belongsTo(Booking::class);
     }
+
+    /** Paiement d'un abonnement à l'annuaire des lives (sinon : paiement d'une réservation). */
+    public function liveSubscription(): BelongsTo
+    {
+        return $this->belongsTo(LiveSubscription::class);
+    }
 }

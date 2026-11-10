@@ -220,7 +220,7 @@ class AdminController extends Controller
     public function payments()
     {
         return Inertia::render('admin/payments', [
-            'payments' => Payment::with('booking:id,reference,shop_name,full_name')->latest('id')->paginate(25),
+            'payments' => Payment::with('booking:id,reference,shop_name,full_name', 'liveSubscription:id,reference,user_id', 'liveSubscription.user:id,name')->latest('id')->paginate(25),
             'pending' => Booking::where('status', 'EN_ATTENTE_PAIEMENT')->orderByDesc('id')->get(['id', 'reference', 'shop_name', 'amount']),
         ]);
     }

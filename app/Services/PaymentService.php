@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\BusinessException;
 use App\Models\Booking;
+use App\Models\LiveSubscription;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Payments\Providers;
@@ -17,7 +18,33 @@ use Illuminate\Support\Facades\Log;
  */
 class PaymentService
 {
-    public function __construct(private BookingService $bookings) {}
+    public function __construct(private BookingService $bookings, private LiveHub $hub) {}
+
+    /**
+     * Paiement d'un abonnement à l'annuaire des lives. Activé uniquement par la notification serveur (ou la vérification de serveur à serveur).
+     *
+     * @return array{payment: Payment, checkoutUrl: string}
+     */
+    public function checkoutSubscription(LiveSubscription $sub): array
+    {
+        if ($sub->status !== 'EN_ATTENTE_PAIEMENT') {
+            throw new BusinessException('Cet abonnement n\'attend pas de paiement.');
+        }
+        $sub->loadMissing('user');
+        $payment = Payment::create([
+            'live_subscription_id' => $sub->id, 'provider' => config('services.payment.provider', 'mock'),
+            'method' => 'EN_LIGNE', 'amount' => $sub->amount, 'currency' => 'XOF',
+        ]);
+        $res = Providers::make($payment->provider)->createCheckout([
+            'orderId' => $sub->reference, 'amount' => $payment->amount, 'currency' => 'XOF',
+            'customer' => ['name' => $sub->user->name, 'email' => $sub->user->email, 'phone' => (string) $sub->user->phone_e164],
+            'returnUrl' => route('live.payment.return', ['reference' => $sub->reference]),
+            'description' => 'Abonnement Lives OCD '.$sub->reference.' — '.$sub->days.' jours, '.$sub->quota.' lives',
+        ]);
+        $payment->update(['provider_ref' => $res['providerRef']]);
+
+        return ['payment' => $payment, 'checkoutUrl' => $res['checkoutUrl']];
+    }
 
     /** @return array{payment: Payment, checkoutUrl: string} */
     public function checkout(Booking $booking): array
@@ -31,7 +58,7 @@ class PaymentService
         ]);
 
         $res = Providers::make($payment->provider)->createCheckout([
-            'orderId' => (string) $booking->id, 'amount' => $payment->amount, 'currency' => 'XOF',
+            'orderId' => $booking->reference, 'amount' => $payment->amount, 'currency' => 'XOF',
             'customer' => ['name' => $booking->full_name, 'email' => $booking->email, 'phone' => $booking->phone],
             'returnUrl' => route('payment.return', ['token' => $booking->tracking_token]),
             'description' => 'Réservation '.$booking->reference.' — '.$booking->package->name,
@@ -68,7 +95,16 @@ class PaymentService
             return 'failed';
         });
 
-        $payment = Payment::where('provider_ref', $providerRef)->with('booking')->first();
+        $payment = Payment::where('provider_ref', $providerRef)->with('booking', 'liveSubscription')->first();
+        if ($payment?->live_subscription_id) {
+            if ($outcome === 'paid') {
+                $this->hub->activate($payment->liveSubscription);
+            } elseif (in_array($outcome, ['failed', 'amount_mismatch'], true)) {
+                $this->hub->cancelPending($payment->liveSubscription);
+            }
+
+            return $outcome;
+        }
         if ($outcome === 'paid') {
             $this->bookings->confirm($payment->booking);
         } elseif (in_array($outcome, ['failed', 'amount_mismatch'], true) && $payment->booking->status === 'EN_ATTENTE_PAIEMENT') {
@@ -84,9 +120,9 @@ class PaymentService
      * Appelé quand le vendeur revient du paiement : c'est la réponse de l'agrégateur qui fait foi, jamais l'adresse de retour.
      * Utile quand la notification (webhook) tarde ou ne peut pas arriver (développement en local). Au plus un appel toutes les 4 s.
      */
-    public function syncPending(Booking $booking): void
+    public function syncPending(Booking|LiveSubscription $for): void
     {
-        $p = Payment::where('booking_id', $booking->id)->where('status', 'EN_ATTENTE')->where('provider', '!=', 'manuel')
+        $p = Payment::where($for instanceof Booking ? 'booking_id' : 'live_subscription_id', $for->id)->where('status', 'EN_ATTENTE')->where('provider', '!=', 'manuel')
             ->whereNotNull('provider_ref')->latest('id')->first();
         if (! $p || ! Cache::add('pay-sync-'.$p->id, 1, 4)) {
             return;

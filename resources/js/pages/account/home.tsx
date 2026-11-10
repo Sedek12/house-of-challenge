@@ -5,6 +5,7 @@ import SiteLayout from '@/layouts/site-layout';
 import { buildPhone, Country, splitPhone } from '@/lib/countries';
 import { fcfa, fmtLome } from '@/lib/format';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ArrowRight, Radio } from 'lucide-react';
 import { useState } from 'react';
 
 type Profile = { name: string; email: string; phone: string | null; country: string | null };
@@ -49,6 +50,11 @@ export default function Account({ profile, countries, domains, shops, bookings }
     return (
         <SiteLayout title="Mon compte">
             <Head title="Mon compte" />
+            <Link href={route('live.mine')} className="group mb-6 flex items-center gap-4 rounded-xl bg-[#1F1F1F] p-5 text-white">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10"><Radio className="size-5 text-[#FE7C02]" aria-hidden /></span>
+                <span className="flex-1"><b className="block text-lg">Mon live</b><span className="text-sm text-neutral-300">Vous êtes en live sur TikTok ? Faites-le apparaître sur OCD Live.</span></span>
+                <ArrowRight className="size-5 text-[#FE7C02] transition-transform group-hover:translate-x-1" aria-hidden />
+            </Link>
             <div className="grid gap-8 lg:grid-cols-2">
                 <section className="grid content-start gap-3">
                     <div className="flex items-center justify-between">

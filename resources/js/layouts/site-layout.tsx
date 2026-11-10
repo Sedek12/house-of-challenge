@@ -7,7 +7,7 @@ import { Menu, X } from 'lucide-react';
 import { CSSProperties, PropsWithChildren, ReactNode, useState } from 'react';
 
 /** Onglets publics de l'en-tête. */
-const publicNav: [string, string][] = [['Accueil', 'home'], ['À propos', 'about'], ['Packages', 'packages'], ['Nous contacter', 'contact']];
+const publicNav: [string, string][] = [['Accueil', 'home'], ['Lives en direct', 'lives'], ['Packages', 'packages'], ['À propos', 'about'], ['Nous contacter', 'contact']];
 
 export default function SiteLayout({ children, portal, title, centered }: PropsWithChildren<{ portal?: 'team' | 'admin'; title?: ReactNode; centered?: boolean }>) {
     const { auth, site, flash, errors } = usePage<Shared>().props;
@@ -106,6 +106,8 @@ export default function SiteLayout({ children, portal, title, centered }: PropsW
                             <h2 className="mb-4 text-base font-semibold text-white">Navigation</h2>
                             <ul className="grid gap-2.5">
                                 <li><Link className={linkCls} href={route('home')}>Accueil</Link></li>
+                                <li><Link className={linkCls} href={route('lives')}>Lives en direct</Link></li>
+                                <li><Link className={linkCls} href={route('live.mine')}>Mettre mon live en avant</Link></li>
                                 <li><Link className={linkCls} href={route('about')}>À propos</Link></li>
                                 <li><Link className={linkCls} href={route('packages')}>Packages</Link></li>
                                 <li><Link className={linkCls} href={route('reserve')}>Réserver mon passage</Link></li>
